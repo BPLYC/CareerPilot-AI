@@ -1,0 +1,17 @@
+[
+  {
+    "case": "case_1_ai_intern",
+    "resume_path": "data/sample_resume.txt",
+    "jd_path": "data/sample_jd_ai_intern.txt"
+  },
+  {
+    "case": "case_2_swe_intern",
+    "resume_path": "data/sample_resume.txt",
+    "jd_path": "data/sample_jd_swe_intern.txt"
+  },
+  {
+    "case": "case_3_data_analyst",
+    "resume_path": "data/sample_resume.txt",
+    "jd_path": "data/sample_jd_data_analyst.txt"
+  }
+]

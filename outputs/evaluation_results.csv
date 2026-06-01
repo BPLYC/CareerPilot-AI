@@ -1,0 +1,4 @@
+case,method,keyword_coverage_before,keyword_coverage_after,required_skills_match_rate,missing_skills_count,bullet_count_generated,reflection_revision_rate,star_coverage_rate,application_answer_count,interview_question_count
+case_1_ai_intern,CareerPilot,0.42857142857142855,0.42857142857142855,0.4,3,4,0.0,0.0,4,6
+case_2_swe_intern,CareerPilot,0.3333333333333333,0.3333333333333333,0.5,2,4,0.0,0.0,4,6
+case_3_data_analyst,CareerPilot,0.3333333333333333,0.3333333333333333,0.6666666666666666,1,4,0.0,0.0,4,6

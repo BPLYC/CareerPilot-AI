@@ -1,0 +1,7 @@
+AI Intern
+
+We are looking for an AI Intern to help build machine learning prototypes and evaluate NLP features. Required skills include Python, SQL, statistics, and experience with PyTorch or TensorFlow. Familiarity with NLP, data preprocessing, and model evaluation is important.
+
+Preferred qualifications include scikit-learn, data visualization, cloud experience, and experience collaborating with software engineers.
+
+Responsibilities include preparing datasets, testing model outputs, documenting experiments, and communicating technical findings clearly.

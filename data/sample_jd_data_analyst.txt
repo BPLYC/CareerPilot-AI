@@ -1,0 +1,7 @@
+Data Analyst Intern
+
+The Data Analyst Intern will support business reporting, dashboard creation, and ad hoc analysis. Required skills include SQL, Python, Excel, Tableau, statistical analysis, and clear communication.
+
+Preferred qualifications include Power BI, Airflow, business acumen, and experience working with messy operational datasets.
+
+Responsibilities include cleaning data, building dashboards, analyzing trends, and presenting insights to non-technical stakeholders.

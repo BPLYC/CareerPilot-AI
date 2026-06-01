@@ -1,0 +1,25 @@
+Alex Chen
+Email: alex.chen@example.com
+Phone: 555-012-3456
+
+Education
+University of California, Riverside
+Bachelor of Science in Computer Science, expected May 2025
+GPA: 3.6/4.0
+
+Skills
+Python, SQL, scikit-learn, pandas, NumPy, Git, Flask, Matplotlib, SQLite
+
+Projects
+Movie Recommendation System
+Built a movie recommendation system using Python, pandas, NumPy, and scikit-learn. Compared collaborative filtering and content-based recommendations and visualized model results with Matplotlib.
+
+Sales Data Dashboard
+Analyzed sales data using SQL, pandas, and Matplotlib. Cleaned transaction data, grouped monthly revenue trends, and prepared dashboard charts for a class project.
+
+Personal Task Manager Web App
+Developed a personal task manager web app using Flask, SQLite, HTML, and CSS. Implemented create, update, and delete workflows and used Git for version control.
+
+Experience
+Data Analyst Intern, Local Startup, Summer 2023
+Assisted with cleaning customer records, writing SQL queries, and preparing weekly reporting tables for a small operations team.

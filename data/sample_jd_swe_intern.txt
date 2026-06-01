@@ -1,0 +1,7 @@
+Software Engineering Intern
+
+We are hiring a Software Engineering Intern to help develop backend services and internal tools. Required skills include Python or Java, REST API development, Git, databases, and debugging.
+
+Preferred qualifications include Docker, system design basics, TypeScript, cloud deployment, and experience with frontend frameworks.
+
+Responsibilities include implementing features, writing tests, reviewing code, and documenting technical decisions.
