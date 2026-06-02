@@ -53,7 +53,7 @@ Included:
 - MVP evaluation metrics.
 - Deterministic fallback logic so development can continue without an API key.
 
-Current status: Phase 1 source code scaffold is mostly implemented, but environment and real API verification are still pending.
+Current status: Phase 1 source code scaffold is implemented, dependencies are installed in `.venv`, Streamlit can start locally, a direct DeepSeek thinking-mode API smoke test has succeeded, and a full default DeepSeek-backed sample workflow has run with `errors=0`.
 
 ### Phase 2: Expansion
 
@@ -87,7 +87,9 @@ Environment variables:
 ```env
 DEEPSEEK_API_KEY=your_key_here
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=your_selected_model
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING=disabled
+DEEPSEEK_REASONING_EFFORT=low
 EMBEDDING_PROVIDER=local_hash
 ```
 
@@ -106,7 +108,7 @@ Phase 2 knowledge files exist but are not fully wired into the workflow yet:
 - `application_examples`
 - `interview_bank`
 
-ChromaDB is optional for now. If `chromadb` is unavailable, the app falls back to local markdown retrieval.
+ChromaDB is optional for runtime. In the current local environment it is installed and `data/vectorstore/` has been created; if ChromaDB is unavailable, the app falls back to local markdown retrieval.
 
 ### Pydantic
 
@@ -275,33 +277,58 @@ Completed in source code:
 - Cache.
 - Evaluation script.
 - Conservative application answer starters and interview practice questions for normal-match workflows.
+- Local Python 3.12 `.venv` with Streamlit, LangGraph, ChromaDB, parser, test, and evaluation dependencies installed.
+- DeepSeek V4 thinking-mode configuration through `.env`.
+- Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
+- Structured-output normalization for common real DeepSeek schema drift.
+- Cache key versioning to prevent stale pre-fix workflow states from reappearing in the UI.
 - README.
 - Basic tests.
 
 Verified:
 
 - Main modules compile.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 8 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 16 tests.
 - `python eval/run_eval.py` generated `outputs/evaluation_results.csv`.
+- Streamlit 1.58.0 is installed and `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200.
+- Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
+- Full DeepSeek-backed sample workflow succeeded with default `deepseek-v4-pro`, thinking disabled, low effort configuration and `errors=0`.
+- ChromaDB vectorstore files exist under `data/vectorstore/`.
 
 Not yet verified:
 
-- Streamlit app runtime, because `streamlit` is not installed in the current Python environment.
-- Real DeepSeek calls, because `.env` is not configured yet.
-- ChromaDB persistent vectorstore build, because `chromadb` is not installed in the current environment.
+- Full manual UI click-through with sample data.
+- DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
 
 ## Near-Term Priorities
 
-1. Install dependencies in a clean Python 3.11+ environment.
-2. Create `.env` from `.env.example`.
-3. Configure DeepSeek key, base URL, and model.
-4. Run `streamlit run app.py`.
-5. Load sample data and verify all UI tabs.
-6. Run one real DeepSeek-backed workflow.
-7. Adjust prompts or JSON parsing if real model output is unstable.
-8. Optionally install and test ChromaDB vectorstore persistence.
-9. Improve evaluation metrics after real runs, including application answer and interview prep quality.
-10. Add screenshots or a demo GIF.
+1. Open `http://localhost:8501` while Streamlit is running.
+2. Load sample data and verify all UI tabs.
+3. Address the LangChain Chroma deprecation warning if vectorstore work continues.
+4. Improve Streamlit polish based on manual UI testing.
+5. Improve evaluation metrics after real runs, including application answer and interview prep quality.
+6. Add screenshots or a demo GIF.
+
+## Manual UI Verification
+
+Recommended local demo settings:
+
+- `Thinking Mode`: `disabled`
+- `Reasoning Effort`: `low`
+
+User checklist:
+
+- Click `Load Sample Data`.
+- Click `Run CareerPilot Analysis`.
+- Review Input, Match Report, Resume Tips, Application & Interview, and Workflow Trace.
+- Check that generated text does not invent resume facts, unsupported metrics, visa status, work authorization, sponsorship details, or compensation expectations.
+- If the trace shows `Fallback scoring completed` after recent code changes, rerun the analysis. The app now versions cache keys so old pre-fix cached states are not reused.
+
+## Known Technical Debt
+
+- `src/rag/build_vectorstore.py` uses the deprecated `langchain_community.vectorstores.Chroma` import.
+- Current impact is low: ChromaDB is installed, vectorstore files exist, and markdown fallback retrieval still works.
+- Future fix: add `langchain-chroma`, change the import to `from langchain_chroma import Chroma`, then rerun tests, evaluation, and vectorstore checks.
 
 ## Safety And Privacy
 

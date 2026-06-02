@@ -1,6 +1,6 @@
 """Structured models used by CareerPilot AI."""
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class Education(BaseModel):
@@ -19,7 +19,7 @@ class ProjectExperience(BaseModel):
 
 class WorkExperience(BaseModel):
     company: str
-    role: str
+    role: str = Field(validation_alias=AliasChoices("role", "title", "position"))
     duration: str = Field(default="")
     description: str
 
@@ -59,9 +59,22 @@ class MatchReport(BaseModel):
 
 class BulletSuggestion(BaseModel):
     context: str
-    original_bullet: str = Field(default="")
-    optimized_bullet: str
-    rationale: str
+    original_bullet: str = Field(default="", validation_alias=AliasChoices("original_bullet", "original"))
+    optimized_bullet: str = Field(
+        validation_alias=AliasChoices(
+            "optimized_bullet",
+            "bullet",
+            "optimized",
+            "optimized_text",
+            "suggestion",
+            "suggested_bullet",
+            "suggested_text",
+            "improved_bullet",
+            "rewritten_bullet",
+            "new_bullet",
+        )
+    )
+    rationale: str = Field(validation_alias=AliasChoices("rationale", "reason", "explanation"))
     is_revised_by_reflection: bool = Field(default=False)
 
 

@@ -7,10 +7,11 @@ from typing import Optional
 
 
 CACHE_DIR = os.path.join("outputs", "cache")
+CACHE_VERSION = "v2"
 
 
 def get_cache_key(resume_text: str, jd_text: str) -> str:
-    content = (resume_text or "") + "|||" + (jd_text or "")
+    content = CACHE_VERSION + "|||" + (resume_text or "") + "|||" + (jd_text or "")
     return hashlib.md5(content.encode("utf-8")).hexdigest()
 
 

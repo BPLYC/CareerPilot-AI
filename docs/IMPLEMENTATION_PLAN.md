@@ -63,13 +63,16 @@ Environment variables:
 ```env
 DEEPSEEK_API_KEY=your_key_here
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=your_selected_model
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING=disabled
+DEEPSEEK_REASONING_EFFORT=low
 EMBEDDING_PROVIDER=local_hash
 ```
 
 Acceptance criteria:
 
 - Model name is configurable.
+- DeepSeek thinking mode and reasoning effort are configurable.
 - LLM parsing errors are recorded in `errors`.
 - Prompts are centralized in `src/services/prompts.py`.
 - The app does not invent resume facts, skills, metrics, visa details, authorization status, or compensation answers.
@@ -162,44 +165,62 @@ Completed in code:
 - Streamlit UI source code.
 - Cache, evaluation script, sample data, knowledge base files, and basic tests.
 - Phase 2 first slice: application answer starters and interview practice questions on the normal-match path.
+- Python 3.12 virtual environment under `.venv` with project dependencies installed.
+- DeepSeek V4 model configuration with thinking mode and reasoning effort controls.
+- Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
+- Structured-output normalization for common real DeepSeek schema drift.
+- Cache key versioning to avoid stale cached workflow states after LLM parsing fixes.
 
 Verified:
 
 - `python -m py_compile ...` passed for the main modules.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 8 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 16 tests.
 - `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 first-slice metrics.
+- `streamlit` 1.58.0 is installed in `.venv`.
+- `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
+- Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
+- Full DeepSeek-backed CareerPilot sample workflow succeeded with the default `deepseek-v4-pro`, thinking disabled, low effort configuration: score 55, 8 optimized bullets, 4 application answer fields, 5 interview questions, and `errors=0`.
+- ChromaDB is installed and `data/vectorstore/` was created.
 
-Not yet verified because of local environment limits:
+Not yet fully verified because of current environment limits:
 
-- `streamlit run app.py` has not been run successfully because `streamlit` is not installed in the current Python environment.
-- `pip install -r requirements.txt` was blocked or timed out in this environment.
-- Real DeepSeek API calls have not been tested yet because `DEEPSEEK_API_KEY` and `DEEPSEEK_MODEL` are not configured.
-- ChromaDB vectorstore build has not been tested because `chromadb` is not installed; the app currently falls back to markdown retrieval.
+- Full manual browser interaction with all Streamlit tabs still needs to be checked by opening `http://localhost:8501`.
+- DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
 
 ## Remaining Work
 
+Manual UI verification for the user:
+
+- Open `http://localhost:8501` while Streamlit is running.
+- In the sidebar, keep `Thinking Mode` as `disabled` and `Reasoning Effort` as `low` for a faster local demo.
+- Click `Load Sample Data`.
+- Click `Run CareerPilot Analysis`.
+- Check all five tabs: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
+- Confirm the generated bullets, application answers, and interview questions do not invent resume facts.
+- If the workflow trace shows `Fallback scoring completed` for the sample data, rerun after the cache key version update or clear `outputs/cache/`; stale pre-fix cache entries can show old fallback traces.
+
 Immediate execution plan:
 
-- [ ] Create a clean Python 3.11+ virtual environment.
-- [ ] Install dependencies with `python -m pip install -r requirements.txt`.
-- [ ] Copy `.env.example` to `.env`.
-- [ ] Fill `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
-- [ ] Run `streamlit run app.py`.
+- [x] Create a clean Python 3.11+ virtual environment.
+- [x] Install dependencies with `python -m pip install -r requirements.txt`.
+- [x] Copy `.env.example` to `.env`.
+- [x] Fill `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
+- [x] Run `streamlit run app.py`.
 - [ ] Use the sample data loader and run one AI Intern analysis in the UI.
 - [ ] Confirm all tabs render: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
-- [ ] Run one real DeepSeek-backed workflow and inspect whether JSON parsing is stable.
-- [ ] If parsing is unstable, tighten prompts or structured parsing in `src/services/structured_output.py`.
-- [ ] Run `python eval/run_eval.py` after the real workflow path is verified.
-- [ ] Optionally install `chromadb` and verify vectorstore creation under `data/vectorstore/`.
+- [x] Rerun one real DeepSeek-backed workflow after schema normalization and inspect whether JSON parsing is stable.
+- [x] If parsing is unstable, tighten prompts or structured parsing in `src/services/structured_output.py`.
+- [x] Run `python eval/run_eval.py` after the real workflow path is verified.
+- [x] Optionally install `chromadb` and verify vectorstore creation under `data/vectorstore/`.
 
 Near-term MVP follow-up:
 
-- Install dependencies in a clean Python 3.11+ environment.
-- Configure `.env` with `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
-- Start the Streamlit app with `streamlit run app.py`.
+- Use the existing `.venv` Python 3.12 environment.
+- Keep `.env` configured with `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_THINKING`, and `DEEPSEEK_REASONING_EFFORT`.
+- Start the Streamlit app with `.venv\Scripts\python.exe -m streamlit run app.py`.
 - Run one sample-data analysis through the UI and verify all tabs render correctly.
-- Test one real DeepSeek-backed run and adjust prompts if output JSON is unstable.
-- Optionally install `chromadb` and verify persistent vectorstore creation under `data/vectorstore/`.
+- Use non-thinking mode for the local demo path unless the user specifically wants slower reasoning output.
+- Address the LangChain Chroma deprecation warning later by moving to `langchain-chroma` if persistent vectorstore work continues.
 - Improve evaluation so STAR coverage, keyword coverage, application answer quality, and interview prep quality reflect the generated output more accurately.
 - Add screenshots or a demo GIF after the UI is verified.
 
@@ -212,6 +233,18 @@ Phase 2 follow-up:
 - Add full Baseline vs LLM-only vs CareerPilot Full comparison.
 - Expand tests around real LLM parsing failures and UI workflows.
 
+Known technical debt:
+
+- `src/rag/build_vectorstore.py` still imports `Chroma` from `langchain_community.vectorstores`.
+- LangChain now warns that this import path is deprecated and recommends the standalone `langchain-chroma` package.
+- This does not block the current MVP because ChromaDB currently builds and local fallback retrieval still works.
+- When RAG persistence becomes a priority, install `langchain-chroma`, update the import to `from langchain_chroma import Chroma`, and rerun vectorstore/evaluation checks.
+
+Resolved during current stabilization:
+
+- Old cached workflow results could keep showing pre-fix fallback traces in the UI. `src/services/cache.py` now includes a cache version prefix so old cache files are not reused after schema/parser fixes.
+- DeepSeek sometimes returns `MatchReport.relevant_projects` as objects instead of strings. `src/services/structured_output.py` now normalizes those objects to project names before Pydantic validation.
+
 ## Progress
 
 - [x] Milestone 0: Save Plan And Project Foundation
@@ -223,10 +256,10 @@ Phase 2 follow-up:
 - [x] Milestone 6: Cache And Evaluation Script
 - [x] Milestone 7: README And Demo Polish Draft
 - [x] Phase 2 First Slice: Application Answer And Interview Prep Nodes
-- [ ] Environment: Install full dependencies
-- [ ] Verification: Run Streamlit UI locally
-- [ ] Verification: Run real DeepSeek-backed analysis
-- [ ] Verification: Build ChromaDB vectorstore
+- [x] Environment: Install full dependencies
+- [x] Verification: Run Streamlit UI locally
+- [x] Verification: Run real DeepSeek-backed analysis
+- [x] Verification: Build ChromaDB vectorstore
 - [ ] Phase 2: Parallel Application And Interview Expansion
 
 ### Completed: Initial MVP Implementation
@@ -263,7 +296,107 @@ Files changed:
 Verification:
 
 - `python -m py_compile app.py src\services\evaluation.py src\models\schemas.py src\workflow\careerpilot_graph.py src\agents\application_answer_agent.py src\agents\interview_coach_agent.py`
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 8 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed; the current expanded suite is tracked in the latest verification section.
 - `python eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 
 Next: Verify Streamlit in a clean Python 3.11+ environment, then run one real DeepSeek-backed workflow to confirm structured JSON stability for the new Phase 2 nodes.
+
+### Completed: Local Environment And DeepSeek Setup
+
+Date: 2026-06-01
+
+Summary: Created `.venv` with Python 3.12.13, installed project dependencies including Streamlit 1.58.0 and ChromaDB 1.5.9, configured `.env` locally, updated DeepSeek defaults to `deepseek-v4-pro` with thinking enabled and high reasoning effort, and added small structured-output normalization for real LLM schema drift. The `.env` file is ignored by git and the API key is not stored in documentation.
+
+Files changed:
+
+- `.env`
+- `.env.example`
+- `README.md`
+- `docs/PROJECT_SPEC.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `src/services/provider_config.py`
+- `src/services/llm_client.py`
+- `src/services/structured_output.py`
+- `src/models/schemas.py`
+- `tests/conftest.py`
+- `data/vectorstore/`
+
+Verification:
+
+- `.venv\Scripts\python.exe -m pip install -r requirements.txt` completed.
+- `.venv\Scripts\streamlit.exe --version` returned Streamlit 1.58.0.
+- `.venv\Scripts\python.exe -m pytest -q` passed; the current expanded suite is tracked in the latest verification section.
+- `.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+- Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
+- `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
+
+Remaining: Manually click through the Streamlit UI tabs with sample data, then continue Phase 2 expansion.
+
+### Completed: Real DeepSeek Workflow Stabilization
+
+Date: 2026-06-02
+
+Summary: Re-ran the real DeepSeek-backed sample workflow after network/usage approval was available, fixed additional real LLM schema drift, added test coverage for those output shapes, and changed the local demo default to `DEEPSEEK_THINKING=disabled` with `DEEPSEEK_REASONING_EFFORT=low` for reasonable latency. Thinking mode remains available through `.env` and the Streamlit sidebar.
+
+Files changed:
+
+- `.env`
+- `.env.example`
+- `app.py`
+- `README.md`
+- `docs/PROJECT_SPEC.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `src/services/provider_config.py`
+- `src/services/structured_output.py`
+- `src/models/schemas.py`
+- `tests/test_structured_output.py`
+
+Verification:
+
+- `.venv\Scripts\python.exe -m pytest -q` passed with 16 tests.
+- `.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+- Real DeepSeek workflow with current default `.env` succeeded: score 55, 8 optimized bullets, 4 application answer fields, 5 interview questions, `errors=0`.
+- `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
+
+Next: Open `http://localhost:8501`, load sample data, run the app through the UI, and confirm all five tabs render the expected output.
+
+### Completed: UI Cache And Match Report Stabilization
+
+Date: 2026-06-02
+
+Summary: Investigated a UI run where the trace showed `MatchScoringNode: Fallback scoring completed`. The displayed state matched a stale pre-fix cache entry under `outputs/cache/`. Added cache key versioning and `MatchReport.relevant_projects` normalization so future runs do not reuse stale cached workflow states and can tolerate DeepSeek returning relevant projects as objects.
+
+Files changed:
+
+- `.gitignore`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `src/services/cache.py`
+- `src/services/structured_output.py`
+- `tests/test_structured_output.py`
+
+Verification:
+
+- `.venv\Scripts\python.exe -m pytest -q` passed with 16 tests.
+- `.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+
+Note: A post-fix real DeepSeek rerun was not possible in this step because Codex network/usage approval was temporarily unavailable. The behavior is covered by unit tests and the previous default DeepSeek workflow had already reached `errors=0` before this cache-version follow-up.
+
+### Current User Action Checklist
+
+Date: 2026-06-02
+
+The Streamlit app can be started with:
+
+```powershell
+cd D:\CareerPilot_AI
+.\.venv\Scripts\Activate.ps1
+python -m streamlit run app.py
+```
+
+If `http://localhost:8501` refuses the connection, restart Streamlit with an explicit loopback address and open `http://127.0.0.1:8501`:
+
+```powershell
+python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+After opening `http://localhost:8501`, the user should load sample data, run the analysis, and inspect each tab for correctness. The most important review is factual safety: optimized bullets, application answers, and interview prep should stay grounded in the resume and job description.

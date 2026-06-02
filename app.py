@@ -63,6 +63,21 @@ def main() -> None:
         if model_input:
             os.environ["DEEPSEEK_MODEL"] = model_input
 
+        thinking_options = ["disabled", "enabled"]
+        thinking_index = thinking_options.index(config.thinking) if config.thinking in thinking_options else 0
+        thinking_mode = st.selectbox("Thinking Mode", thinking_options, index=thinking_index)
+        os.environ["DEEPSEEK_THINKING"] = thinking_mode
+
+        effort_options = ["low", "medium", "high"]
+        effort_index = effort_options.index(config.reasoning_effort) if config.reasoning_effort in effort_options else 0
+        reasoning_effort = st.selectbox(
+            "Reasoning Effort",
+            effort_options,
+            index=effort_index,
+            disabled=thinking_mode == "disabled",
+        )
+        os.environ["DEEPSEEK_REASONING_EFFORT"] = reasoning_effort
+
         st.caption(f"Base URL: {config.base_url}")
         st.divider()
         selected_jd = st.selectbox("Select Sample JD", list(SAMPLE_JDS))

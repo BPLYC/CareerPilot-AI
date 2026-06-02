@@ -39,13 +39,22 @@ def get_llm(model: str = "", temperature: float = 0.3):
         from langchain_openai import ChatOpenAI
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("Install langchain-openai to use the LLM client.") from exc
+    thinking_enabled = config.thinking == "enabled"
+    kwargs = {
+        "model": config.model,
+        "api_key": config.api_key,
+        "base_url": config.base_url,
+        "max_retries": 2,
+        "request_timeout": 60,
+    }
+    if thinking_enabled:
+        kwargs["reasoning_effort"] = config.reasoning_effort
+        kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+    else:
+        kwargs["temperature"] = temperature
+        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
     return ChatOpenAI(
-        model=config.model,
-        temperature=temperature,
-        api_key=config.api_key,
-        base_url=config.base_url,
-        max_retries=2,
-        request_timeout=60,
+        **kwargs,
     )
 
 

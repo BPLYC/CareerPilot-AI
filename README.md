@@ -63,16 +63,38 @@ Edit `.env`:
 ```env
 DEEPSEEK_API_KEY=your_key_here
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_MODEL=your_selected_model
+DEEPSEEK_MODEL=deepseek-v4-pro
+DEEPSEEK_THINKING=disabled
+DEEPSEEK_REASONING_EFFORT=low
 EMBEDDING_PROVIDER=local_hash
 ```
 
-The project can still run deterministic fallback logic without an API key.
+The project can still run deterministic fallback logic without an API key. For deeper but slower analysis, switch `DEEPSEEK_THINKING=enabled` and choose `DEEPSEEK_REASONING_EFFORT=low`, `medium`, or `high`.
+The Streamlit sidebar also exposes thinking mode and reasoning effort controls for local demos.
 
 ## How To Run
 
 ```powershell
 streamlit run app.py
+```
+
+For the local project virtual environment:
+
+```powershell
+cd D:\CareerPilot_AI
+.\.venv\Scripts\Activate.ps1
+python -m streamlit run app.py
+```
+
+Open `http://localhost:8501`, click `Load Sample Data`, then click `Run CareerPilot Analysis`. For the fastest demo, keep `Thinking Mode` set to `disabled` and `Reasoning Effort` set to `low`.
+If an old result still shows fallback traces, rerun the analysis; the app now versions cache keys so pre-fix cached workflow states are not reused.
+
+If the browser says the site refused to connect, restart Streamlit and try `http://127.0.0.1:8501`:
+
+```powershell
+cd D:\CareerPilot_AI
+.\.venv\Scripts\Activate.ps1
+python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
 ## Evaluation
@@ -101,6 +123,7 @@ The script writes `outputs/evaluation_results.csv`.
 
 - User-selected application question drafting.
 - Role-specific interview coaching expansion.
+- Replace deprecated `langchain_community.vectorstores.Chroma` usage with `langchain-chroma` when persistent RAG work continues.
 - Full baseline vs LLM-only vs CareerPilot evaluation.
 - SQLite run history.
 - Demo GIF and richer README screenshots.
