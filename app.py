@@ -28,14 +28,15 @@ def load_sample_data(selected_jd: str) -> None:
     st.session_state["sample_jd"] = read_text(SAMPLE_JDS[selected_jd])
 
 
-def run_analysis(resume_text: str, jd_text: str) -> dict:
-    key = get_cache_key(resume_text, jd_text)
+def run_analysis(resume_text: str, jd_text: str, application_questions: list[str] | None = None) -> dict:
+    application_questions = application_questions or []
+    key = get_cache_key(resume_text, jd_text, application_questions)
     cached = load_from_cache(key)
     if cached:
         st.info("Loaded cached analysis for the same resume and JD.")
         return cached
 
-    state = create_initial_state(resume_text, jd_text)
+    state = create_initial_state(resume_text, jd_text, application_questions)
     final_state = state
     with st.status("Running CareerPilot Analysis...", expanded=True) as status:
         for event in stream_workflow(state):
@@ -101,15 +102,23 @@ def main() -> None:
         with col2:
             st.subheader("Job Description")
             jd_text = st.text_area("Paste JD here", height=390, value=st.session_state.get("sample_jd", ""))
+        application_question_text = st.text_area(
+            "Optional application questions",
+            height=120,
+            placeholder="One question per line, such as: Why are you interested in this internship?",
+        )
 
         if st.button("Run CareerPilot Analysis", type="primary", use_container_width=True):
             try:
                 file_text = parse_resume_file(resume_file) if resume_file else ""
                 resume_text = file_text or pasted_resume
+                application_questions = [
+                    line.strip() for line in application_question_text.splitlines() if line.strip()
+                ]
                 if not resume_text.strip() or not jd_text.strip():
                     st.error("Please provide both a resume and a job description.")
                 else:
-                    st.session_state["last_result"] = run_analysis(resume_text, jd_text)
+                    st.session_state["last_result"] = run_analysis(resume_text, jd_text, application_questions)
             except Exception as exc:
                 st.error(f"Analysis failed: {exc}")
 
@@ -177,6 +186,14 @@ def main() -> None:
                     if answers.get(key):
                         st.markdown(f"**{label}**")
                         st.write(answers[key])
+                custom_answers = answers.get("custom_answers", [])
+                if custom_answers:
+                    st.markdown("#### Custom Application Questions")
+                    for item in custom_answers:
+                        with st.expander(item.get("question", "Application question"), expanded=True):
+                            st.write(item.get("answer", ""))
+                            if item.get("review_notice"):
+                                st.caption(item["review_notice"])
 
             questions = state.get("interview_questions", [])
             if questions:

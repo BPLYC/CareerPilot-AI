@@ -22,7 +22,8 @@ Students applying for AI, data, and software internships need help understanding
 - Match scoring with low-match branching.
 - Resume bullet suggestions grounded in the existing resume.
 - Reflection review for factual consistency.
-- Conservative application answer starters and interview practice questions.
+- Conservative application answer starters, optional application questions, and interview practice questions.
+- Parallel Phase 2 preparation so application answers and interview coaching run independently after reflection.
 - Local Streamlit UI and workflow trace.
 
 ## Tech Stack
@@ -32,7 +33,7 @@ Students applying for AI, data, and software internships need help understanding
 - LangGraph
 - Pydantic
 - DeepSeek OpenAI-compatible API
-- ChromaDB optional local vector store
+- ChromaDB optional local vector store through `langchain-chroma`
 
 ## Architecture Diagram
 
@@ -45,8 +46,12 @@ flowchart TD
     D -->|"score >= 45"| F["Resume Optimizer"]
     F --> G["Reflection"]
     G -->|"issues and iteration < 2"| F
-    G -->|"passed or max iterations"| H["Final Report"]
-    E --> H
+    G -->|"passed or max iterations"| H["Phase 2 Parallel Prep"]
+    H --> I["Application Answers"]
+    H --> J["Interview Coach"]
+    I --> K["Final Report"]
+    J --> K
+    E --> K
 ```
 
 ## Setup Instructions
@@ -86,7 +91,7 @@ cd D:\CareerPilot_AI
 python -m streamlit run app.py
 ```
 
-Open `http://localhost:8501`, click `Load Sample Data`, then click `Run CareerPilot Analysis`. For the fastest demo, keep `Thinking Mode` set to `disabled` and `Reasoning Effort` set to `low`.
+Open `http://localhost:8501`, click `Load Sample Data`, optionally add application questions, then click `Run CareerPilot Analysis`. For the fastest demo, keep `Thinking Mode` set to `disabled` and `Reasoning Effort` set to `low`.
 If an old result still shows fallback traces, rerun the analysis; the app now versions cache keys so pre-fix cached workflow states are not reused.
 
 If the browser says the site refused to connect, restart Streamlit and try `http://127.0.0.1:8501`:
@@ -103,7 +108,7 @@ python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 python eval/run_eval.py
 ```
 
-The script writes `outputs/evaluation_results.csv`.
+The script writes `outputs/evaluation_results.csv`. Metrics include keyword coverage before and after generated bullets, required skill match rate, reflection revision rate, STAR-ready bullet coverage, application answer evidence coverage, sensitive-question refusal count, interview prep-notes coverage, project follow-up count, role-specific question count, and required-skill evidence question count.
 
 ## Safety And Privacy
 
@@ -111,7 +116,7 @@ The script writes `outputs/evaluation_results.csv`.
 - Uploaded files are processed in memory and are not saved.
 - API keys are loaded from `.env`.
 - AI-generated content must be reviewed and personalized before submitting.
-- Visa, work authorization, and compensation answers must be filled by the user.
+- Visa, work authorization, sponsorship, salary, legal eligibility, and compensation answers must be filled by the user.
 
 ## Limitations
 
@@ -121,13 +126,10 @@ The script writes `outputs/evaluation_results.csv`.
 
 ## Future Work
 
-- User-selected application question drafting.
-- Role-specific interview coaching expansion.
-- Replace deprecated `langchain_community.vectorstores.Chroma` usage with `langchain-chroma` when persistent RAG work continues.
+- Demo GIF and richer README screenshots.
 - Full baseline vs LLM-only vs CareerPilot evaluation.
 - SQLite run history.
-- Demo GIF and richer README screenshots.
 
 ## Resume Bullet For This Project
 
-Built CareerPilot AI, a LangGraph-based multi-agent system with conditional routing, a reflection loop for factual resume optimization, local RAG knowledge retrieval, and evaluation metrics, delivered as a Streamlit application.
+Built CareerPilot AI, a LangGraph-based multi-agent system with conditional routing, a reflection loop for factual resume optimization, local RAG knowledge retrieval, parallel application/interview preparation, and evaluation metrics, delivered as a Streamlit application.

@@ -143,15 +143,17 @@ Document setup, architecture, workflow, RAG, evaluation, safety, limitations, an
 
 - ApplicationAnswerNode. First deterministic/LLM-compatible slice implemented.
 - InterviewCoachNode. First deterministic/LLM-compatible slice implemented.
+- Custom application questions with sensitive-question refusal implemented.
+- Role-specific interview practice and project follow-up fallback questions implemented.
+- Parallel application and interview nodes implemented.
 - Full DOCX polish.
-- Parallel application and interview nodes.
 - SQLite result persistence.
 - Baseline vs LLM-only vs CareerPilot Full evaluation.
 - Demo GIF and screenshots.
 
 ## Current Status
 
-The initial MVP code scaffold is implemented, but the project is not fully production-ready yet.
+The MVP is implemented and locally stabilized. Phase 2 application/interview expansion, evaluation metrics, RAG dependency cleanup, and parallel Phase 2 execution are implemented. The project is still a local demo rather than a production service.
 
 Completed in code:
 
@@ -170,34 +172,36 @@ Completed in code:
 - Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
 - Structured-output normalization for common real DeepSeek schema drift.
 - Cache key versioning to avoid stale cached workflow states after LLM parsing fixes.
+- Phase 2 expansion slice: optional user-provided application questions, custom answer starters, sensitive-question refusal, and role-specific interview follow-ups.
+- Expanded evaluation metrics for keyword coverage delta, application answer evidence, sensitive-question refusal, and interview prep coverage.
+- RAG Chroma integration migrated from deprecated `langchain_community.vectorstores.Chroma` to `langchain_chroma.Chroma`.
+- Phase 2 application answer and interview prep nodes now run in parallel and join before final report.
 
 Verified:
 
 - `python -m py_compile ...` passed for the main modules.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 16 tests.
-- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 first-slice metrics.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 22 tests.
+- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
 - `streamlit` 1.58.0 is installed in `.venv`.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
 - Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
 - Full DeepSeek-backed CareerPilot sample workflow succeeded with the default `deepseek-v4-pro`, thinking disabled, low effort configuration: score 55, 8 optimized bullets, 4 application answer fields, 5 interview questions, and `errors=0`.
 - ChromaDB is installed and `data/vectorstore/` was created.
+- `get_or_build_vectorstore()` returned a `Chroma` object through `langchain-chroma`.
 
 Not yet fully verified because of current environment limits:
 
-- Full manual browser interaction with all Streamlit tabs still needs to be checked by opening `http://localhost:8501`.
 - DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
+- README screenshot capture is still pending. It was attempted on 2026-06-11, but the in-app browser failed at its sandbox boundary and local Playwright/Selenium packages were unavailable.
 
 ## Remaining Work
 
-Manual UI verification for the user:
+Manual UI verification completed on 2026-06-09:
 
-- Open `http://localhost:8501` while Streamlit is running.
-- In the sidebar, keep `Thinking Mode` as `disabled` and `Reasoning Effort` as `low` for a faster local demo.
-- Click `Load Sample Data`.
-- Click `Run CareerPilot Analysis`.
-- Check all five tabs: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
-- Confirm the generated bullets, application answers, and interview questions do not invent resume facts.
-- If the workflow trace shows `Fallback scoring completed` for the sample data, rerun after the cache key version update or clear `outputs/cache/`; stale pre-fix cache entries can show old fallback traces.
+- Streamlit was open at `http://127.0.0.1:8501`.
+- The user reran sample data with optional application questions.
+- The Application & Interview tab showed Application Answer Starters, Custom Application Questions, Interview Practice, and safety notices.
+- Custom application questions reached the UI after manual input.
 
 Immediate execution plan:
 
@@ -206,8 +210,8 @@ Immediate execution plan:
 - [x] Copy `.env.example` to `.env`.
 - [x] Fill `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
 - [x] Run `streamlit run app.py`.
-- [ ] Use the sample data loader and run one AI Intern analysis in the UI.
-- [ ] Confirm all tabs render: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
+- [x] Use the sample data loader and run one AI Intern analysis in the UI.
+- [x] Confirm all tabs render: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
 - [x] Rerun one real DeepSeek-backed workflow after schema normalization and inspect whether JSON parsing is stable.
 - [x] If parsing is unstable, tighten prompts or structured parsing in `src/services/structured_output.py`.
 - [x] Run `python eval/run_eval.py` after the real workflow path is verified.
@@ -218,27 +222,19 @@ Near-term MVP follow-up:
 - Use the existing `.venv` Python 3.12 environment.
 - Keep `.env` configured with `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_THINKING`, and `DEEPSEEK_REASONING_EFFORT`.
 - Start the Streamlit app with `.venv\Scripts\python.exe -m streamlit run app.py`.
-- Run one sample-data analysis through the UI and verify all tabs render correctly.
 - Use non-thinking mode for the local demo path unless the user specifically wants slower reasoning output.
-- Address the LangChain Chroma deprecation warning later by moving to `langchain-chroma` if persistent vectorstore work continues.
-- Improve evaluation so STAR coverage, keyword coverage, application answer quality, and interview prep quality reflect the generated output more accurately.
 - Add screenshots or a demo GIF after the UI is verified.
 
 Phase 2 follow-up:
 
-- Expand ApplicationAnswerNode to support user-selected application questions while still refusing sensitive eligibility, visa, sponsorship, and compensation answers.
-- Expand InterviewCoachNode with role-specific technical question sets and project deep-dive follow-ups.
-- Add full application/interview parallel execution.
 - Add SQLite run history if persistent local history is still desired.
 - Add full Baseline vs LLM-only vs CareerPilot Full comparison.
 - Expand tests around real LLM parsing failures and UI workflows.
 
 Known technical debt:
 
-- `src/rag/build_vectorstore.py` still imports `Chroma` from `langchain_community.vectorstores`.
-- LangChain now warns that this import path is deprecated and recommends the standalone `langchain-chroma` package.
-- This does not block the current MVP because ChromaDB currently builds and local fallback retrieval still works.
-- When RAG persistence becomes a priority, install `langchain-chroma`, update the import to `from langchain_chroma import Chroma`, and rerun vectorstore/evaluation checks.
+- README screenshots or a demo GIF are still pending because Codex's in-app browser could not be started in the latest check.
+- DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
 
 Resolved during current stabilization:
 
@@ -260,7 +256,10 @@ Resolved during current stabilization:
 - [x] Verification: Run Streamlit UI locally
 - [x] Verification: Run real DeepSeek-backed analysis
 - [x] Verification: Build ChromaDB vectorstore
-- [ ] Phase 2: Parallel Application And Interview Expansion
+- [x] Phase 2: Custom Application Questions And Role-Specific Interview Fallback
+- [x] Verification: Manual Streamlit UI Flow With Custom Application Questions
+- [x] Phase 2 Evaluation Metrics Expansion
+- [x] Phase 2: Parallel Application And Interview Execution
 
 ### Completed: Initial MVP Implementation
 
@@ -353,7 +352,7 @@ Files changed:
 
 Verification:
 
-- `.venv\Scripts\python.exe -m pytest -q` passed with 16 tests.
+- `.venv\Scripts\python.exe -m pytest -q` passed with 19 tests.
 - `.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 - Real DeepSeek workflow with current default `.env` succeeded: score 55, 8 optimized bullets, 4 application answer fields, 5 interview questions, `errors=0`.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
@@ -376,21 +375,134 @@ Files changed:
 
 Verification:
 
-- `.venv\Scripts\python.exe -m pytest -q` passed with 16 tests.
+- `.venv\Scripts\python.exe -m pytest -q` passed with 19 tests.
 - `.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 
 Note: A post-fix real DeepSeek rerun was not possible in this step because Codex network/usage approval was temporarily unavailable. The behavior is covered by unit tests and the previous default DeepSeek workflow had already reached `errors=0` before this cache-version follow-up.
 
+### Completed: Phase 2 Custom Questions And Interview Expansion
+
+Date: 2026-06-08
+
+Summary: Expanded the Phase 2 application and interview prep slice. The Streamlit input page now accepts optional application questions, passes them through the workflow state, and includes them in the cache key. `ApplicationAnswerNode` generates conservative custom answer starters while forcing visa, work authorization, sponsorship, salary, legal eligibility, and compensation questions back to the applicant. `InterviewCoachNode` now adds role-specific technical questions and project follow-up prompts in deterministic fallback mode.
+
+Files changed:
+
+- `app.py`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `src/agents/application_answer_agent.py`
+- `src/agents/interview_coach_agent.py`
+- `src/models/schemas.py`
+- `src/services/cache.py`
+- `src/workflow/state.py`
+- `tests/test_workflow.py`
+
+Verification:
+
+- `.\.venv\Scripts\python.exe -m py_compile app.py src\services\cache.py src\models\schemas.py src\workflow\state.py src\agents\application_answer_agent.py src\agents\interview_coach_agent.py` passed.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 19 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+- `http://127.0.0.1:8501` returned HTTP 200 from an already-running Streamlit server.
+- Manual UI verification passed after the user reran sample data with optional application questions. The Application & Interview tab showed Application Answer Starters, Custom Application Questions, Interview Practice, and safety notices.
+
+Next: Add README screenshots or a demo GIF, or consider SQLite run history if persistent local history remains useful.
+
+### Completed: Phase 2 Evaluation Metrics Expansion
+
+Date: 2026-06-11
+
+Summary: Expanded deterministic evaluation beyond artifact counts. The evaluator now measures keyword coverage after combining the original resume with generated bullets, keyword coverage delta, corrected application answer counts, custom application answer count, sensitive custom-question refusal count, application answer evidence rate, interview prep-notes rate, project follow-up coverage, role-specific interview coverage, and required-skill evidence question count. While testing this, token normalization was tightened so sentence punctuation like `Python.` no longer prevents keyword matches.
+
+Files changed:
+
+- `README.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `AGENTS.md`
+- `src/services/evaluation.py`
+- `src/utils/text_utils.py`
+- `tests/test_evaluation.py`
+- `tests/test_scoring.py`
+- `outputs/evaluation_results.csv`
+
+Verification:
+
+- `.\.venv\Scripts\python.exe -m py_compile src\services\evaluation.py src\utils\text_utils.py tests\test_evaluation.py tests\test_scoring.py` passed.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 20 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+- `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the documented `PATH` workaround.
+
+Note: README screenshot capture remains pending. The in-app browser failed at its sandbox boundary on 2026-06-11, and local Playwright/Selenium packages were not installed, so this slice moved to the next near-term task instead of fabricating screenshot assets.
+
+Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+
+### Completed: Phase 2 Parallel Application And Interview Execution
+
+Date: 2026-06-11
+
+Summary: Changed the normal-match Phase 2 workflow so application answer drafting and interview coaching run in parallel after reflection passes or reaches its limit. The fallback runner now uses `ThreadPoolExecutor` for the two Phase 2 nodes. The LangGraph path now fans out from `phase_two_parallel` to `application_answer` and `interview_coach`, then joins both branches before `final_report`. Low-match workflows still skip Phase 2 prep and go directly from low-match warning to final report.
+
+Files changed:
+
+- `src/workflow/careerpilot_graph.py`
+- `tests/test_workflow.py`
+- `README.md`
+- `AGENTS.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `outputs/evaluation_results.csv`
+
+Verification:
+
+- `.\.venv\Scripts\python.exe -m py_compile src\workflow\careerpilot_graph.py tests\test_workflow.py` passed.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest tests\test_workflow.py -q` passed with 9 tests.
+- `.\.venv\Scripts\python.exe -c "from src.workflow.careerpilot_graph import graph; print(type(graph).__name__ if graph else 'fallback')"` returned `CompiledStateGraph`.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 22 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
+- A fallback workflow smoke test showed `PhaseTwoParallelNode`, `ApplicationAnswerNode`, `InterviewCoachNode`, and exactly one `FinalReportNode` trace entry.
+
+Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+
+### Completed: RAG Chroma Dependency Cleanup
+
+Date: 2026-06-11
+
+Summary: Replaced the deprecated `langchain_community.vectorstores.Chroma` import with the standalone `langchain_chroma.Chroma` integration. The optional vectorstore path still falls back to local markdown retrieval if Chroma loading or construction fails, so deterministic offline behavior is preserved.
+
+Files changed:
+
+- `requirements.txt`
+- `src/rag/build_vectorstore.py`
+- `README.md`
+- `AGENTS.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `outputs/evaluation_results.csv`
+
+Verification:
+
+- Installed `langchain-chroma` 1.1.0 in `.venv`.
+- `.\.venv\Scripts\python.exe -m py_compile src\rag\build_vectorstore.py src\rag\retriever.py` passed.
+- `.\.venv\Scripts\python.exe -c "from langchain_chroma import Chroma; print(Chroma.__name__)"` returned `Chroma`.
+- `.\.venv\Scripts\python.exe -c "from src.rag.build_vectorstore import get_or_build_vectorstore; vs=get_or_build_vectorstore(); print(type(vs).__name__ if vs is not None else 'fallback')"` returned `Chroma`.
+- `.\.venv\Scripts\python.exe -c "from src.rag.retriever import retrieve_context; ctx=retrieve_context({'job_title':'AI Intern','required_skills':['Python','PyTorch'],'tools_and_technologies':['PyTorch']}); print({k: len(v) for k, v in ctx.items()})"` returned snippets for all expected RAG collections.
+- `.\.venv\Scripts\python.exe -c "import importlib.util; print(importlib.util.find_spec('langchain_community'))"` returned `None` after uninstalling the old local package.
+- `.\.venv\Scripts\python.exe -m pip check` reported no broken requirements.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 20 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv` without the old Chroma deprecation warning.
+
+Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+
 ### Current User Action Checklist
 
-Date: 2026-06-02
+Date: 2026-06-09
 
 The Streamlit app can be started with:
 
 ```powershell
 cd D:\CareerPilot_AI
-.\.venv\Scripts\Activate.ps1
-python -m streamlit run app.py
+.\.venv\Scripts\python.exe -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
 If `http://localhost:8501` refuses the connection, restart Streamlit with an explicit loopback address and open `http://127.0.0.1:8501`:
@@ -399,4 +511,9 @@ If `http://localhost:8501` refuses the connection, restart Streamlit with an exp
 python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-After opening `http://localhost:8501`, the user should load sample data, run the analysis, and inspect each tab for correctness. The most important review is factual safety: optimized bullets, application answers, and interview prep should stay grounded in the resume and job description.
+The sample-data Streamlit UI flow has been manually verified, including optional application questions and the Application & Interview tab.
+
+Current next work options:
+
+- Add README screenshots or a demo GIF.
+- Consider SQLite local run history if persistent local history is still desired.

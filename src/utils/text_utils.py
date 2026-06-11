@@ -19,7 +19,7 @@ def truncate_text(text: str, max_chars: int = 16000) -> Tuple[str, bool]:
 
 
 def normalize_token(value: str) -> str:
-    return re.sub(r"[^a-z0-9+#.]+", "", (value or "").lower())
+    return re.sub(r"[^a-z0-9+#.]+", "", (value or "").lower()).strip(".")
 
 
 def contains_keyword(text: str, keyword: str) -> bool:

@@ -3,6 +3,7 @@ from src.services.scoring import keyword_coverage, matched_and_missing_skills, s
 
 def test_keyword_coverage():
     assert keyword_coverage("Python and SQL project", ["Python", "SQL", "Docker"]) == 2 / 3
+    assert keyword_coverage("Built APIs with Python.", ["Python"]) == 1.0
 
 
 def test_skill_matching():

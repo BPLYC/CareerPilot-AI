@@ -7,11 +7,12 @@ from typing import Optional
 
 
 CACHE_DIR = os.path.join("outputs", "cache")
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 
 
-def get_cache_key(resume_text: str, jd_text: str) -> str:
-    content = CACHE_VERSION + "|||" + (resume_text or "") + "|||" + (jd_text or "")
+def get_cache_key(resume_text: str, jd_text: str, application_questions: list[str] | None = None) -> str:
+    questions = json.dumps(application_questions or [], ensure_ascii=False, sort_keys=True)
+    content = CACHE_VERSION + "|||" + (resume_text or "") + "|||" + (jd_text or "") + "|||" + questions
     return hashlib.md5(content.encode("utf-8")).hexdigest()
 
 

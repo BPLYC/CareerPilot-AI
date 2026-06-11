@@ -53,7 +53,7 @@ Included:
 - MVP evaluation metrics.
 - Deterministic fallback logic so development can continue without an API key.
 
-Current status: Phase 1 source code scaffold is implemented, dependencies are installed in `.venv`, Streamlit can start locally, a direct DeepSeek thinking-mode API smoke test has succeeded, and a full default DeepSeek-backed sample workflow has run with `errors=0`.
+Current status: Phase 1 is complete enough for local demo use, dependencies are installed in `.venv`, Streamlit can start locally, a direct DeepSeek thinking-mode API smoke test has succeeded, and a full default DeepSeek-backed sample workflow has run with `errors=0`.
 
 ### Phase 2: Expansion
 
@@ -63,8 +63,10 @@ Planned:
 
 - ApplicationAnswerNode. First conservative drafting slice is implemented.
 - InterviewCoachNode. First interview practice slice is implemented.
+- Optional user-provided application questions with sensitive-question refusal are implemented.
+- Role-specific fallback interview questions and project follow-ups are implemented.
+- Parallel application and interview nodes are implemented.
 - Full DOCX polish.
-- Parallel application and interview nodes.
 - SQLite local run history if still useful.
 - Full comparison evaluation: Baseline vs LLM-only vs CareerPilot Full.
 - Demo GIF and screenshots.
@@ -105,10 +107,10 @@ MVP RAG uses:
 
 Phase 2 knowledge files exist but are not fully wired into the workflow yet:
 
-- `application_examples`
+- `application_question_examples`
 - `interview_bank`
 
-ChromaDB is optional for runtime. In the current local environment it is installed and `data/vectorstore/` has been created; if ChromaDB is unavailable, the app falls back to local markdown retrieval.
+ChromaDB is optional for runtime and is accessed through `langchain-chroma`. In the current local environment `langchain-chroma` 1.1.0 and ChromaDB 1.5.9 are installed, and `data/vectorstore/` has been created. If ChromaDB is unavailable or loading fails, the app falls back to local markdown retrieval.
 
 ### Pydantic
 
@@ -140,13 +142,16 @@ START
              -> reflection_node
              -> route_after_reflection
                   -> has_exaggeration and iteration < 2: resume_optimizer_node
-                  -> otherwise: final_report_node -> END
+                  -> otherwise: phase_two_parallel_node
+                         -> application_answer_node
+                         -> interview_coach_node
+                         -> join -> final_report_node -> END
 ```
 
 Route rules:
 
 - `route_after_match_scoring`: score below 45 goes to low-match warning.
-- `route_after_reflection`: exaggeration plus iteration below 2 loops back to optimizer.
+- `route_after_reflection`: exaggeration plus iteration below 2 loops back to optimizer; otherwise it enters parallel Phase 2 preparation.
 
 ## Data Models
 
@@ -175,7 +180,7 @@ Important fields:
 - Inputs: `raw_resume_text`, `raw_jd_text`
 - Structured outputs: `resume_profile`, `jd_analysis`, `retrieved_context`, `match_report`
 - Optimization: `optimized_bullets`, `has_exaggeration`, `reflection_feedback`, `reflection_iteration`
-- Phase 2 outputs: `application_answers`, `interview_questions`
+- Phase 2 inputs and outputs: `application_questions`, `application_answers`, `interview_questions`
 - Logs: `workflow_trace`, `errors`, `warnings`
 
 ## Node Responsibilities
@@ -212,6 +217,14 @@ Checks generated bullets for unsupported metrics or unsupported claims. It can r
 
 Does not call the LLM. It appends the final workflow trace message.
 
+### ApplicationAnswerNode
+
+Drafts conservative application answer starters for the fixed Phase 2 prompts and optional user-provided application questions. It must keep visa, work authorization, sponsorship, salary, compensation, legal eligibility, and similar sensitive questions assigned to the applicant.
+
+### InterviewCoachNode
+
+Generates practice questions grounded in the resume, JD, and local interview bank. Deterministic fallback output includes project deep dives, project follow-ups, role-specific technical questions, and required-skill evidence questions.
+
 ## Streamlit UI
 
 Main file:
@@ -246,13 +259,21 @@ MVP metrics:
 
 - Keyword Coverage Before.
 - Keyword Coverage After.
+- Keyword Coverage Delta.
 - Required Skills Match Rate.
 - Missing Skills Count.
 - Bullet Count Generated.
 - Reflection Revision Rate.
 - STAR Coverage Rate.
 - Application Answer Count.
+- Custom Application Answer Count.
+- Sensitive Application Refusal Count.
+- Application Answer Evidence Rate.
 - Interview Question Count.
+- Interview Prep Notes Rate.
+- Interview Project Follow-up Count.
+- Interview Role-specific Count.
+- Interview Required Skill Evidence Count.
 
 Current output:
 
@@ -270,6 +291,8 @@ Completed in source code:
 - Deterministic fallback agents.
 - Workflow graph and fallback runner.
 - RAG markdown fallback and optional ChromaDB path.
+- ChromaDB integration through `langchain-chroma`.
+- Parallel Phase 2 application answer and interview prep execution with a final-report join.
 - Sample data.
 - Knowledge base markdown files.
 - TXT/PDF/DOCX parser modules.
@@ -277,6 +300,9 @@ Completed in source code:
 - Cache.
 - Evaluation script.
 - Conservative application answer starters and interview practice questions for normal-match workflows.
+- Optional custom application questions with sensitive-question refusal.
+- Role-specific deterministic interview questions and project follow-ups.
+- Expanded evaluation metrics for keyword coverage delta, application answer evidence coverage, sensitive-question refusal count, and interview prep coverage.
 - Local Python 3.12 `.venv` with Streamlit, LangGraph, ChromaDB, parser, test, and evaluation dependencies installed.
 - DeepSeek V4 thinking-mode configuration through `.env`.
 - Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
@@ -288,26 +314,24 @@ Completed in source code:
 Verified:
 
 - Main modules compile.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 16 tests.
-- `python eval/run_eval.py` generated `outputs/evaluation_results.csv`.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 22 tests.
+- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
 - Streamlit 1.58.0 is installed and `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200.
 - Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
 - Full DeepSeek-backed sample workflow succeeded with default `deepseek-v4-pro`, thinking disabled, low effort configuration and `errors=0`.
 - ChromaDB vectorstore files exist under `data/vectorstore/`.
+- `get_or_build_vectorstore()` returned a `Chroma` object with the standalone `langchain-chroma` integration.
 
-Not yet verified:
+Not yet fully verified:
 
-- Full manual UI click-through with sample data.
 - DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
+- README screenshot capture is still pending. It was attempted on 2026-06-11, but the in-app browser failed at its sandbox boundary and local Playwright/Selenium packages were unavailable.
 
 ## Near-Term Priorities
 
-1. Open `http://localhost:8501` while Streamlit is running.
-2. Load sample data and verify all UI tabs.
-3. Address the LangChain Chroma deprecation warning if vectorstore work continues.
-4. Improve Streamlit polish based on manual UI testing.
-5. Improve evaluation metrics after real runs, including application answer and interview prep quality.
-6. Add screenshots or a demo GIF.
+1. Add screenshots or a demo GIF.
+2. Improve Streamlit polish based on manual UI testing.
+3. Consider SQLite local run history if persistent local history remains useful.
 
 ## Manual UI Verification
 
@@ -326,9 +350,8 @@ User checklist:
 
 ## Known Technical Debt
 
-- `src/rag/build_vectorstore.py` uses the deprecated `langchain_community.vectorstores.Chroma` import.
-- Current impact is low: ChromaDB is installed, vectorstore files exist, and markdown fallback retrieval still works.
-- Future fix: add `langchain-chroma`, change the import to `from langchain_chroma import Chroma`, then rerun tests, evaluation, and vectorstore checks.
+- README screenshots or a demo GIF are still pending because Codex's in-app browser could not be started in the latest check.
+- DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
 
 ## Safety And Privacy
 

@@ -1,5 +1,7 @@
 """CareerPilot LangGraph workflow and fallback runner."""
 
+from concurrent.futures import ThreadPoolExecutor
+
 from src.agents.application_answer_agent import application_answer_node
 from src.agents.final_report_agent import final_report_node
 from src.agents.interview_coach_agent import interview_coach_node
@@ -24,7 +26,15 @@ def route_after_reflection(state) -> str:
     iteration = state.get("reflection_iteration", 0)
     if has_exaggeration and iteration < 2:
         return "resume_optimizer"
-    return "final_report"
+    return "phase_two_parallel"
+
+
+def phase_two_parallel_node(state) -> dict:
+    return {
+        "workflow_trace": [
+            "PhaseTwoParallelNode: Running application answers and interview coaching in parallel."
+        ]
+    }
 
 
 def _merge_state(state: dict, update: dict) -> dict:
@@ -35,6 +45,17 @@ def _merge_state(state: dict, update: dict) -> dict:
         else:
             merged[key] = value
     return merged
+
+
+def _run_phase_two_parallel(state: dict) -> list[tuple[str, dict]]:
+    phase_two_nodes = [
+        ("application_answer", application_answer_node),
+        ("interview_coach", interview_coach_node),
+    ]
+    base_state = dict(state)
+    with ThreadPoolExecutor(max_workers=len(phase_two_nodes)) as executor:
+        futures = [(name, executor.submit(node, dict(base_state))) for name, node in phase_two_nodes]
+        return [(name, future.result()) for name, future in futures]
 
 
 def stream_workflow(initial_state: dict):
@@ -64,16 +85,16 @@ def stream_workflow(initial_state: dict):
             state = _merge_state(state, update)
             yield {"reflection": state}
 
-            if route_after_reflection(state) == "final_report":
+            if route_after_reflection(state) == "phase_two_parallel":
                 break
 
-        update = application_answer_node(state)
+        update = phase_two_parallel_node(state)
         state = _merge_state(state, update)
-        yield {"application_answer": state}
+        yield {"phase_two_parallel": state}
 
-        update = interview_coach_node(state)
-        state = _merge_state(state, update)
-        yield {"interview_coach": state}
+        for name, update in _run_phase_two_parallel(state):
+            state = _merge_state(state, update)
+            yield {name: state}
 
     update = final_report_node(state)
     state = _merge_state(state, update)
@@ -102,6 +123,7 @@ def build_graph():
     workflow.add_node("low_match_warning", low_match_warning_node)
     workflow.add_node("resume_optimizer", resume_optimizer_node)
     workflow.add_node("reflection", reflection_node)
+    workflow.add_node("phase_two_parallel", phase_two_parallel_node)
     workflow.add_node("application_answer", application_answer_node)
     workflow.add_node("interview_coach", interview_coach_node)
     workflow.add_node("final_report", final_report_node)
@@ -111,8 +133,9 @@ def build_graph():
     workflow.add_edge("jd_analyzer", "rag_retriever")
     workflow.add_edge("rag_retriever", "match_scoring")
     workflow.add_edge("resume_optimizer", "reflection")
-    workflow.add_edge("application_answer", "interview_coach")
-    workflow.add_edge("interview_coach", "final_report")
+    workflow.add_edge("phase_two_parallel", "application_answer")
+    workflow.add_edge("phase_two_parallel", "interview_coach")
+    workflow.add_edge(["application_answer", "interview_coach"], "final_report")
     workflow.add_edge("low_match_warning", "final_report")
     workflow.add_edge("final_report", END)
     workflow.add_conditional_edges(
@@ -123,7 +146,7 @@ def build_graph():
     workflow.add_conditional_edges(
         "reflection",
         route_after_reflection,
-        {"resume_optimizer": "resume_optimizer", "final_report": "application_answer"},
+        {"resume_optimizer": "resume_optimizer", "phase_two_parallel": "phase_two_parallel"},
     )
     return workflow.compile()
 

@@ -11,7 +11,7 @@ VECTORSTORE_PATH = os.path.join("data", "vectorstore")
 
 def get_or_build_vectorstore():
     try:
-        from langchain_community.vectorstores import Chroma
+        from langchain_chroma import Chroma
         from langchain_core.documents import Document
     except ImportError:
         return None
@@ -20,7 +20,7 @@ def get_or_build_vectorstore():
     if os.path.exists(VECTORSTORE_PATH) and os.listdir(VECTORSTORE_PATH):
         try:
             return Chroma(persist_directory=VECTORSTORE_PATH, embedding_function=embeddings)
-        except ImportError:
+        except Exception:
             return None
 
     chunks = load_all_knowledge_docs()
@@ -29,5 +29,5 @@ def get_or_build_vectorstore():
     docs = [Document(page_content=chunk.content, metadata=chunk.metadata) for chunk in chunks]
     try:
         return Chroma.from_documents(docs, embeddings, persist_directory=VECTORSTORE_PATH)
-    except ImportError:
+    except Exception:
         return None

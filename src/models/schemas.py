@@ -78,10 +78,17 @@ class BulletSuggestion(BaseModel):
     is_revised_by_reflection: bool = Field(default=False)
 
 
+class ApplicationQuestionAnswer(BaseModel):
+    question: str
+    answer: str
+    review_notice: str = Field(default="Review and personalize before submitting.")
+
+
 class ApplicationAnswerSet(BaseModel):
     why_this_role: str = Field(default="")
     key_strengths: str = Field(default="")
     project_example: str = Field(default="")
+    custom_answers: list[ApplicationQuestionAnswer] = Field(default_factory=list)
     review_notice: str = Field(default="Review and personalize before submitting.")
 
 
