@@ -180,8 +180,8 @@ Completed in code:
 Verified:
 
 - `python -m py_compile ...` passed for the main modules.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests.
-- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 26 tests.
+- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` and `outputs/evaluation_comparison_summary.csv` with MVP, Phase 2, and comparison metrics.
 - `streamlit` 1.58.0 is installed in `.venv`.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
 - Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
@@ -226,7 +226,6 @@ Near-term MVP follow-up:
 
 Phase 2 follow-up:
 
-- Add full Baseline vs LLM-only vs CareerPilot Full comparison.
 - Expand tests around real LLM parsing failures and UI workflows.
 
 Known technical debt:
@@ -259,6 +258,7 @@ Resolved during current stabilization:
 - [x] Phase 2: Parallel Application And Interview Execution
 - [x] README Screenshots
 - [x] SQLite Run History Summaries
+- [x] Full Baseline vs LLM-only vs CareerPilot Full Comparison
 
 ### Completed: Initial MVP Implementation
 
@@ -405,7 +405,7 @@ Verification:
 - `http://127.0.0.1:8501` returned HTTP 200 from an already-running Streamlit server.
 - Manual UI verification passed after the user reran sample data with optional application questions. The Application & Interview tab showed Application Answer Starters, Custom Application Questions, Interview Practice, and safety notices.
 
-Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
+Next: README screenshots, SQLite run history, and full comparison evaluation were completed later on 2026-06-12.
 
 ### Completed: Phase 2 Evaluation Metrics Expansion
 
@@ -434,7 +434,7 @@ Verification:
 
 Note: README screenshot capture was still pending during this slice because the in-app browser failed at its sandbox boundary on 2026-06-11. It was completed later on 2026-06-12 using local Chrome headless.
 
-Next: SQLite run history was completed later on 2026-06-12; consider the full Baseline vs LLM-only vs CareerPilot Full comparison.
+Next: SQLite run history and full comparison evaluation were completed later on 2026-06-12.
 
 ### Completed: Phase 2 Parallel Application And Interview Execution
 
@@ -461,7 +461,7 @@ Verification:
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 - A fallback workflow smoke test showed `PhaseTwoParallelNode`, `ApplicationAnswerNode`, `InterviewCoachNode`, and exactly one `FinalReportNode` trace entry.
 
-Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
+Next: README screenshots, SQLite run history, and full comparison evaluation were completed later on 2026-06-12.
 
 ### Completed: RAG Chroma Dependency Cleanup
 
@@ -491,7 +491,7 @@ Verification:
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 20 tests.
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv` without the old Chroma deprecation warning.
 
-Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
+Next: README screenshots, SQLite run history, and full comparison evaluation were completed later on 2026-06-12.
 
 ### Current User Action Checklist
 
@@ -514,7 +514,7 @@ The sample-data Streamlit UI flow has been manually verified, including optional
 
 Current next work options:
 
-- Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+- Do focused Streamlit UI polish based on manual testing.
 - Add an optional demo GIF if a short walkthrough would help the README.
 
 ### Completed: README Screenshots
@@ -540,7 +540,7 @@ Verification:
 - Generated `docs/assets/careerpilot-home.png` at 1440x1200.
 - Generated `docs/assets/careerpilot-sample-input.png` at 1440x1200.
 
-Next: SQLite run history was completed later on 2026-06-12; consider the full Baseline vs LLM-only vs CareerPilot Full comparison.
+Next: Full comparison evaluation was completed later on 2026-06-12; consider focused Streamlit UI polish or an optional demo GIF.
 
 ### Completed: SQLite Run History Summaries
 
@@ -566,4 +566,34 @@ Verification:
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 24 tests.
 - `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the new Run History tab.
 
-Next: Add the full Baseline vs LLM-only vs CareerPilot Full comparison, or do focused Streamlit UI polish.
+Next: Full comparison evaluation was completed later on 2026-06-12; consider focused Streamlit UI polish.
+
+### Completed: Full Comparison Evaluation
+
+Date: 2026-06-12
+
+Summary: Expanded the evaluation script to compare three reproducible methods across every evaluation case: `Baseline`, `LLM-only`, and `CareerPilot Full`. Baseline runs parsing, JD analysis, and scoring only. LLM-only runs generation without RAG retrieval, low-match branching, reflection, or parallel workflow tracing. CareerPilot Full runs the existing graph/fallback workflow. The output now includes both per-case rows and method-level averages.
+
+Files changed:
+
+- `eval/run_eval.py`
+- `src/services/comparison_evaluation.py`
+- `src/services/evaluation.py`
+- `tests/test_comparison_evaluation.py`
+- `tests/test_evaluation.py`
+- `outputs/evaluation_results.csv`
+- `outputs/evaluation_comparison_summary.csv`
+- `README.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `AGENTS.md`
+
+Verification:
+
+- `.\.venv\Scripts\python.exe -m py_compile src\services\evaluation.py src\services\comparison_evaluation.py eval\run_eval.py tests\test_evaluation.py tests\test_comparison_evaluation.py` passed.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest tests\test_evaluation.py tests\test_comparison_evaluation.py -q` passed with 3 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv` and `outputs\evaluation_comparison_summary.csv`.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 26 tests.
+- The summary CSV shows Baseline with 0 generated bullets and 0 RAG snippets, LLM-only with generated bullets but 0 RAG/reflection/parallel workflow counts, and CareerPilot Full with RAG snippets, reflection review, and Phase 2 parallel execution counts.
+
+Next: Do focused Streamlit UI polish based on manual testing, or add an optional demo GIF.

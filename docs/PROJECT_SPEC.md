@@ -68,7 +68,7 @@ Planned:
 - Parallel application and interview nodes are implemented.
 - Full DOCX polish.
 - SQLite local run history summaries are implemented.
-- Full comparison evaluation: Baseline vs LLM-only vs CareerPilot Full.
+- Full comparison evaluation is implemented: Baseline vs LLM-only vs CareerPilot Full.
 - Demo GIF and screenshots.
 - More complete UI verification and README assets.
 
@@ -279,6 +279,7 @@ MVP metrics:
 Current output:
 
 - `outputs/evaluation_results.csv`
+- `outputs/evaluation_comparison_summary.csv`
 
 ## Current Implementation Status
 
@@ -304,6 +305,7 @@ Completed in source code:
 - Optional custom application questions with sensitive-question refusal.
 - Role-specific deterministic interview questions and project follow-ups.
 - Expanded evaluation metrics for keyword coverage delta, application answer evidence coverage, sensitive-question refusal count, and interview prep coverage.
+- Full comparison evaluation across Baseline, LLM-only, and CareerPilot Full, with method-level summary output.
 - Local Python 3.12 `.venv` with Streamlit, LangGraph, ChromaDB, parser, test, and evaluation dependencies installed.
 - DeepSeek V4 thinking-mode configuration through `.env`.
 - Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
@@ -316,8 +318,8 @@ Completed in source code:
 Verified:
 
 - Main modules compile.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests.
-- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 26 tests.
+- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` and `outputs/evaluation_comparison_summary.csv` with MVP, Phase 2, and comparison metrics.
 - Streamlit 1.58.0 is installed and `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200.
 - Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
 - Full DeepSeek-backed sample workflow succeeded with default `deepseek-v4-pro`, thinking disabled, low effort configuration and `errors=0`.
@@ -332,8 +334,7 @@ Not yet fully verified:
 ## Near-Term Priorities
 
 1. Improve Streamlit polish based on manual UI testing.
-2. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
-3. Optionally add a short demo GIF.
+2. Optionally add a short demo GIF.
 
 ## Manual UI Verification
 

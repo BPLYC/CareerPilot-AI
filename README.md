@@ -25,6 +25,7 @@ Students applying for AI, data, and software internships need help understanding
 - Conservative application answer starters, optional application questions, and interview practice questions.
 - Parallel Phase 2 preparation so application answers and interview coaching run independently after reflection.
 - Local Streamlit UI, workflow trace, and SQLite-backed run history summaries.
+- Comparison evaluation across Baseline, LLM-only, and CareerPilot Full methods.
 
 ## Tech Stack
 
@@ -124,7 +125,7 @@ node tools\capture_streamlit_screenshot.mjs
 python eval/run_eval.py
 ```
 
-The script writes `outputs/evaluation_results.csv`. Metrics include keyword coverage before and after generated bullets, required skill match rate, reflection revision rate, STAR-ready bullet coverage, application answer evidence coverage, sensitive-question refusal count, interview prep-notes coverage, project follow-up count, role-specific question count, and required-skill evidence question count.
+The script writes `outputs/evaluation_results.csv` with one row per case and method, plus `outputs/evaluation_comparison_summary.csv` with method-level averages. Metrics include keyword coverage before and after generated bullets, required skill match rate, reflection revision rate, STAR-ready bullet coverage, application answer evidence coverage, sensitive-question refusal count, interview prep-notes coverage, project follow-up count, role-specific question count, required-skill evidence question count, RAG snippet count, workflow trace count, reflection review count, and Phase 2 parallel execution count.
 
 ## Safety And Privacy
 
@@ -144,7 +145,6 @@ The script writes `outputs/evaluation_results.csv`. Metrics include keyword cove
 ## Future Work
 
 - Optional demo GIF.
-- Full baseline vs LLM-only vs CareerPilot evaluation.
 
 ## Resume Bullet For This Project
 

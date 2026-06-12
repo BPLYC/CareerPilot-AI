@@ -54,6 +54,12 @@ def test_evaluation_counts_phase_two_quality_metrics():
                 "prep_notes": "Prepare a STAR-style answer.",
             },
         ],
+        "retrieved_context": {"resume_bullets": ["Use action verbs"], "star_examples": ["STAR sample"]},
+        "workflow_trace": [
+            "RAGRetrieverNode: Retrieved 2 knowledge snippets from local knowledge base.",
+            "ReflectionNode (Iteration 0): 0 issue(s) found. Finalizing.",
+            "PhaseTwoParallelNode: Running application answers and interview coaching in parallel.",
+        ],
     }
 
     metrics = evaluate_state(state)
@@ -71,3 +77,7 @@ def test_evaluation_counts_phase_two_quality_metrics():
     assert metrics["interview_project_followup_count"] == 1
     assert metrics["interview_role_specific_count"] == 1
     assert metrics["interview_required_skill_evidence_count"] == 1
+    assert metrics["rag_snippet_count"] == 2
+    assert metrics["workflow_trace_count"] == 3
+    assert metrics["reflection_review_count"] == 1
+    assert metrics["phase_two_parallel_count"] == 1

@@ -100,6 +100,8 @@ def evaluate_state(state: dict) -> dict:
     application_answers = _application_answer_items(answers)
     custom_answers = [item for item in answers.get("custom_answers", []) or [] if item.get("answer")]
     interview_questions = state.get("interview_questions", [])
+    retrieved_context = state.get("retrieved_context") or {}
+    workflow_trace = state.get("workflow_trace") or []
     keyword_before = keyword_coverage(state.get("raw_resume_text", ""), jd.get("keywords", []))
     keyword_after = keyword_coverage(combined_resume_text, jd.get("keywords", []))
     focus_areas = {(item.get("focus_area") or "").lower() for item in interview_questions}
@@ -125,4 +127,8 @@ def evaluate_state(state: dict) -> dict:
         "interview_required_skill_evidence_count": sum(
             1 for item in interview_questions if (item.get("focus_area") or "").lower() == "required skill evidence"
         ),
+        "rag_snippet_count": sum(len(items) for items in retrieved_context.values()),
+        "workflow_trace_count": len(workflow_trace),
+        "reflection_review_count": sum(1 for item in workflow_trace if "ReflectionNode" in item),
+        "phase_two_parallel_count": sum(1 for item in workflow_trace if "PhaseTwoParallelNode" in item),
     }

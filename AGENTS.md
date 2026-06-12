@@ -40,13 +40,14 @@ Completed in code:
 - Expanded evaluation metrics for keyword coverage delta, application answer evidence, sensitive-question refusal, and interview prep coverage.
 - Parallel Phase 2 application answer and interview prep execution with final-report join.
 - SQLite-backed local run history summaries that do not persist raw resumes or raw job descriptions.
+- Full comparison evaluation across Baseline, LLM-only, and CareerPilot Full.
 
 Verified so far:
 
 - `.venv` exists with Python 3.12.13.
 - Streamlit 1.58.0 is installed in `.venv`.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests in the latest project docs.
-- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 26 tests in the latest project docs.
+- `python eval/run_eval.py` generated `outputs/evaluation_results.csv` and `outputs/evaluation_comparison_summary.csv` with MVP, Phase 2, and comparison metrics.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 in prior verification.
 - A full default DeepSeek-backed sample workflow ran with `errors=0`.
 - ChromaDB is installed and `data/vectorstore/` has been created.
@@ -117,6 +118,15 @@ Latest SQLite run history check on 2026-06-12:
 - `outputs/*.sqlite3` is ignored by Git.
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 24 tests.
 - `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the new Run History tab.
+
+Latest full comparison evaluation check on 2026-06-12:
+
+- Added `src/services/comparison_evaluation.py` with reproducible `Baseline`, `LLM-only`, and `CareerPilot Full` evaluation paths.
+- Updated `eval/run_eval.py` to write per-case method rows to `outputs/evaluation_results.csv` and method averages to `outputs/evaluation_comparison_summary.csv`.
+- Added workflow structure metrics: RAG snippet count, workflow trace count, reflection review count, and Phase 2 parallel execution count.
+- In the latest generated summary, Baseline has no generated bullets or RAG snippets, LLM-only has generated bullets but no RAG/reflection/parallel workflow counts, and CareerPilot Full includes RAG snippets, reflection review, and Phase 2 parallel execution.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 26 tests.
+- `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated both evaluation CSV files.
 
 Not fully verified yet:
 
@@ -213,6 +223,6 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
-2. Do focused Streamlit UI polish based on manual testing.
-3. Optionally add a short demo GIF if the README needs a walkthrough.
+1. Do focused Streamlit UI polish based on manual testing.
+2. Optionally add a short demo GIF if the README needs a walkthrough.
+3. Expand tests around real LLM parsing failures and UI workflows.
