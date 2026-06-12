@@ -24,7 +24,7 @@ Students applying for AI, data, and software internships need help understanding
 - Reflection review for factual consistency.
 - Conservative application answer starters, optional application questions, and interview practice questions.
 - Parallel Phase 2 preparation so application answers and interview coaching run independently after reflection.
-- Local Streamlit UI and workflow trace.
+- Local Streamlit UI, workflow trace, and SQLite-backed run history summaries.
 
 ## Tech Stack
 
@@ -130,6 +130,7 @@ The script writes `outputs/evaluation_results.csv`. Metrics include keyword cove
 
 - This tool assists but never automates job applications.
 - Uploaded files are processed in memory and are not saved.
+- Run history stores summary metadata only; raw resumes and job descriptions are not persisted.
 - API keys are loaded from `.env`.
 - AI-generated content must be reviewed and personalized before submitting.
 - Visa, work authorization, sponsorship, salary, legal eligibility, and compensation answers must be filled by the user.
@@ -144,7 +145,6 @@ The script writes `outputs/evaluation_results.csv`. Metrics include keyword cove
 
 - Optional demo GIF.
 - Full baseline vs LLM-only vs CareerPilot evaluation.
-- SQLite run history.
 
 ## Resume Bullet For This Project
 

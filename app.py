@@ -7,6 +7,7 @@ import streamlit as st
 from src.parsers.file_parser import parse_resume_file
 from src.services.cache import get_cache_key, load_from_cache, save_to_cache
 from src.services.provider_config import get_provider_config
+from src.services.run_history import list_recent_runs, record_run
 from src.workflow.careerpilot_graph import stream_workflow
 from src.workflow.state import create_initial_state
 
@@ -28,12 +29,20 @@ def load_sample_data(selected_jd: str) -> None:
     st.session_state["sample_jd"] = read_text(SAMPLE_JDS[selected_jd])
 
 
+def save_run_history(cache_key: str, state: dict) -> None:
+    try:
+        record_run(cache_key, state)
+    except Exception as exc:
+        st.warning(f"Run history could not be saved: {exc}")
+
+
 def run_analysis(resume_text: str, jd_text: str, application_questions: list[str] | None = None) -> dict:
     application_questions = application_questions or []
     key = get_cache_key(resume_text, jd_text, application_questions)
     cached = load_from_cache(key)
     if cached:
         st.info("Loaded cached analysis for the same resume and JD.")
+        save_run_history(key, cached)
         return cached
 
     state = create_initial_state(resume_text, jd_text, application_questions)
@@ -45,6 +54,7 @@ def run_analysis(resume_text: str, jd_text: str, application_questions: list[str
             st.write(f"{node_name}: {traces[-1] if traces else 'completed'}")
         status.update(label="Analysis complete", state="complete")
     save_to_cache(key, final_state)
+    save_run_history(key, final_state)
     return final_state
 
 
@@ -89,8 +99,8 @@ def main() -> None:
     st.title("CareerPilot AI")
     st.caption("LangGraph-based Multi-Agent RAG System for Resume-JD Matching")
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["Input", "Match Report", "Resume Tips", "Application & Interview", "Workflow Trace"]
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["Input", "Match Report", "Resume Tips", "Application & Interview", "Workflow Trace", "Run History"]
     )
 
     with tab1:
@@ -218,6 +228,35 @@ def main() -> None:
                     st.error(error)
             with st.expander("View Full State JSON"):
                 st.json(state)
+
+    with tab6:
+        st.markdown("#### Recent Local Runs")
+        try:
+            runs = list_recent_runs(limit=10)
+        except Exception as exc:
+            runs = []
+            st.warning(f"Run history could not be loaded: {exc}")
+        if not runs:
+            st.info("Run an analysis to create local history.")
+        else:
+            st.caption("History stores summary metadata only. Raw resumes and job descriptions are not persisted.")
+            rows = []
+            for run in runs:
+                rows.append(
+                    {
+                        "Time": run["created_at"],
+                        "Role": run["job_title"],
+                        "Score": run["match_score"],
+                        "Matched": run["matched_skills_count"],
+                        "Missing": run["missing_skills_count"],
+                        "Bullets": run["optimized_bullets_count"],
+                        "Answers": run["application_answer_count"],
+                        "Interview Qs": run["interview_question_count"],
+                        "Warnings": run["warnings_count"],
+                        "Errors": run["errors_count"],
+                    }
+                )
+            st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
 if __name__ == "__main__":

@@ -39,12 +39,13 @@ Completed in code:
 - Structured-output normalization for common real DeepSeek schema drift.
 - Expanded evaluation metrics for keyword coverage delta, application answer evidence, sensitive-question refusal, and interview prep coverage.
 - Parallel Phase 2 application answer and interview prep execution with final-report join.
+- SQLite-backed local run history summaries that do not persist raw resumes or raw job descriptions.
 
 Verified so far:
 
 - `.venv` exists with Python 3.12.13.
 - Streamlit 1.58.0 is installed in `.venv`.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 22 tests in the latest project docs.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests in the latest project docs.
 - `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 in prior verification.
 - A full default DeepSeek-backed sample workflow ran with `errors=0`.
@@ -106,6 +107,16 @@ Latest README screenshot capture on 2026-06-12:
 - `docs/assets/careerpilot-sample-input.png` shows the sample resume and AI Intern job description loaded through the sidebar.
 - `tools/capture_streamlit_screenshot.mjs` starts Streamlit, opens local Chrome headless through DevTools, waits for real Streamlit text instead of the loading skeleton, and writes both PNGs.
 - Use the `node tools\capture_streamlit_screenshot.mjs` command documented in `README.md` to regenerate screenshots after UI changes.
+
+Latest SQLite run history check on 2026-06-12:
+
+- Added `src/services/run_history.py` with a standard-library SQLite store at `outputs/history.sqlite3`.
+- Added a Streamlit `Run History` tab that shows the 10 most recent local run summaries.
+- History records summary metadata only: role, score, output counts, warning/error counts, and matched/missing skills.
+- Raw resume text and raw job-description text are not stored in SQLite.
+- `outputs/*.sqlite3` is ignored by Git.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 24 tests.
+- `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the new Run History tab.
 
 Not fully verified yet:
 
@@ -202,6 +213,6 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Consider SQLite run history if persistent local history is still desired.
-2. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+1. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+2. Do focused Streamlit UI polish based on manual testing.
 3. Optionally add a short demo GIF if the README needs a walkthrough.

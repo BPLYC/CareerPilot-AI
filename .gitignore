@@ -2,6 +2,7 @@
 data/vectorstore/
 outputs/cache/
 outputs/*.log
+outputs/*.sqlite3
 /streamlit*.log
 *.pdf
 __pycache__/

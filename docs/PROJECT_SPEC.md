@@ -67,7 +67,7 @@ Planned:
 - Role-specific fallback interview questions and project follow-ups are implemented.
 - Parallel application and interview nodes are implemented.
 - Full DOCX polish.
-- SQLite local run history if still useful.
+- SQLite local run history summaries are implemented.
 - Full comparison evaluation: Baseline vs LLM-only vs CareerPilot Full.
 - Demo GIF and screenshots.
 - More complete UI verification and README assets.
@@ -238,6 +238,7 @@ Tabs:
 - Resume Tips.
 - Application & Interview.
 - Workflow Trace.
+- Run History.
 
 Sidebar:
 
@@ -306,6 +307,7 @@ Completed in source code:
 - Local Python 3.12 `.venv` with Streamlit, LangGraph, ChromaDB, parser, test, and evaluation dependencies installed.
 - DeepSeek V4 thinking-mode configuration through `.env`.
 - Streamlit sidebar controls for DeepSeek thinking mode and reasoning effort.
+- SQLite-backed run history summaries that do not persist raw resumes or raw job descriptions.
 - Structured-output normalization for common real DeepSeek schema drift.
 - Cache key versioning to prevent stale pre-fix workflow states from reappearing in the UI.
 - README.
@@ -314,7 +316,7 @@ Completed in source code:
 Verified:
 
 - Main modules compile.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 22 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests.
 - `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
 - Streamlit 1.58.0 is installed and `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200.
 - Direct DeepSeek API smoke test succeeded with `deepseek-v4-pro`, thinking enabled, `reasoning_effort=high`, and returned `reasoning_content`.
@@ -330,9 +332,8 @@ Not yet fully verified:
 ## Near-Term Priorities
 
 1. Improve Streamlit polish based on manual UI testing.
-2. Consider SQLite local run history if persistent local history remains useful.
-3. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
-4. Optionally add a short demo GIF.
+2. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+3. Optionally add a short demo GIF.
 
 ## Manual UI Verification
 
@@ -358,5 +359,6 @@ User checklist:
 - API keys are loaded from environment variables only.
 - `.env` is ignored by git.
 - Uploaded files are processed in memory.
+- Run history stores local summary metadata only and does not persist raw resumes or raw job descriptions.
 - Generated content includes a review warning.
 - Visa, authorization, and compensation questions must be answered by the user.

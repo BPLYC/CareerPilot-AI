@@ -180,7 +180,7 @@ Completed in code:
 Verified:
 
 - `python -m py_compile ...` passed for the main modules.
-- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 22 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q` passed with 24 tests.
 - `python eval/run_eval.py` generated `outputs/evaluation_results.csv` with MVP and Phase 2 metrics.
 - `streamlit` 1.58.0 is installed in `.venv`.
 - `streamlit run app.py --server.port 8501 --server.headless true` returned HTTP 200 on `http://localhost:8501`.
@@ -226,7 +226,6 @@ Near-term MVP follow-up:
 
 Phase 2 follow-up:
 
-- Add SQLite run history if persistent local history is still desired.
 - Add full Baseline vs LLM-only vs CareerPilot Full comparison.
 - Expand tests around real LLM parsing failures and UI workflows.
 
@@ -259,6 +258,7 @@ Resolved during current stabilization:
 - [x] Phase 2 Evaluation Metrics Expansion
 - [x] Phase 2: Parallel Application And Interview Execution
 - [x] README Screenshots
+- [x] SQLite Run History Summaries
 
 ### Completed: Initial MVP Implementation
 
@@ -405,7 +405,7 @@ Verification:
 - `http://127.0.0.1:8501` returned HTTP 200 from an already-running Streamlit server.
 - Manual UI verification passed after the user reran sample data with optional application questions. The Application & Interview tab showed Application Answer Starters, Custom Application Questions, Interview Practice, and safety notices.
 
-Next: README screenshots were completed later on 2026-06-12; consider SQLite run history if persistent local history remains useful.
+Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
 
 ### Completed: Phase 2 Evaluation Metrics Expansion
 
@@ -434,7 +434,7 @@ Verification:
 
 Note: README screenshot capture was still pending during this slice because the in-app browser failed at its sandbox boundary on 2026-06-11. It was completed later on 2026-06-12 using local Chrome headless.
 
-Next: Consider SQLite run history if persistent local history is still desired, or add the full Baseline vs LLM-only vs CareerPilot Full comparison.
+Next: SQLite run history was completed later on 2026-06-12; consider the full Baseline vs LLM-only vs CareerPilot Full comparison.
 
 ### Completed: Phase 2 Parallel Application And Interview Execution
 
@@ -461,7 +461,7 @@ Verification:
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 - A fallback workflow smoke test showed `PhaseTwoParallelNode`, `ApplicationAnswerNode`, `InterviewCoachNode`, and exactly one `FinalReportNode` trace entry.
 
-Next: README screenshots were completed later on 2026-06-12; consider SQLite run history or the full comparison evaluation.
+Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
 
 ### Completed: RAG Chroma Dependency Cleanup
 
@@ -491,7 +491,7 @@ Verification:
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 20 tests.
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv` without the old Chroma deprecation warning.
 
-Next: README screenshots were completed later on 2026-06-12; consider SQLite run history or the full comparison evaluation.
+Next: README screenshots and SQLite run history were completed later on 2026-06-12; consider the full comparison evaluation.
 
 ### Current User Action Checklist
 
@@ -514,7 +514,6 @@ The sample-data Streamlit UI flow has been manually verified, including optional
 
 Current next work options:
 
-- Consider SQLite local run history if persistent local history is still desired.
 - Add full Baseline vs LLM-only vs CareerPilot Full comparison.
 - Add an optional demo GIF if a short walkthrough would help the README.
 
@@ -541,4 +540,30 @@ Verification:
 - Generated `docs/assets/careerpilot-home.png` at 1440x1200.
 - Generated `docs/assets/careerpilot-sample-input.png` at 1440x1200.
 
-Next: Consider SQLite run history if persistent local history is still desired, or add the full Baseline vs LLM-only vs CareerPilot Full comparison.
+Next: SQLite run history was completed later on 2026-06-12; consider the full Baseline vs LLM-only vs CareerPilot Full comparison.
+
+### Completed: SQLite Run History Summaries
+
+Date: 2026-06-12
+
+Summary: Added a local SQLite run history for Streamlit analyses. Each completed analysis records summary metadata only, including role, match score, output counts, warning/error counts, and matched/missing skills. Raw resume text and raw job-description text are intentionally not persisted.
+
+Files changed:
+
+- `app.py`
+- `.gitignore`
+- `src/services/run_history.py`
+- `tests/test_run_history.py`
+- `README.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `AGENTS.md`
+
+Verification:
+
+- `.\.venv\Scripts\python.exe -m py_compile app.py src\services\run_history.py tests\test_run_history.py` passed.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest tests\test_run_history.py -q` passed with 2 tests.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 24 tests.
+- `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the new Run History tab.
+
+Next: Add the full Baseline vs LLM-only vs CareerPilot Full comparison, or do focused Streamlit UI polish.
