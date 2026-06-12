@@ -325,13 +325,14 @@ Verified:
 Not yet fully verified:
 
 - DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
-- README screenshot capture is still pending. It was attempted on 2026-06-11, but the in-app browser failed at its sandbox boundary and local Playwright/Selenium packages were unavailable.
+- README screenshots were captured on 2026-06-12 with local Chrome headless and stored under `docs/assets/`.
 
 ## Near-Term Priorities
 
-1. Add screenshots or a demo GIF.
-2. Improve Streamlit polish based on manual UI testing.
-3. Consider SQLite local run history if persistent local history remains useful.
+1. Improve Streamlit polish based on manual UI testing.
+2. Consider SQLite local run history if persistent local history remains useful.
+3. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+4. Optionally add a short demo GIF.
 
 ## Manual UI Verification
 
@@ -350,7 +351,6 @@ User checklist:
 
 ## Known Technical Debt
 
-- README screenshots or a demo GIF are still pending because Codex's in-app browser could not be started in the latest check.
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
 
 ## Safety And Privacy

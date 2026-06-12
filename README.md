@@ -102,6 +102,22 @@ cd D:\CareerPilot_AI
 python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
+## Demo Screenshots
+
+Input screen with local DeepSeek configuration and Phase 2 tabs:
+
+![CareerPilot AI input screen](docs/assets/careerpilot-home.png)
+
+Sample resume and AI Intern job description loaded through the Streamlit sidebar:
+
+![CareerPilot AI sample data loaded](docs/assets/careerpilot-sample-input.png)
+
+To refresh these screenshots after UI changes, use Node.js and local Google Chrome:
+
+```powershell
+node tools\capture_streamlit_screenshot.mjs
+```
+
 ## Evaluation
 
 ```powershell
@@ -126,7 +142,7 @@ The script writes `outputs/evaluation_results.csv`. Metrics include keyword cove
 
 ## Future Work
 
-- Demo GIF and richer README screenshots.
+- Optional demo GIF.
 - Full baseline vs LLM-only vs CareerPilot evaluation.
 - SQLite run history.
 

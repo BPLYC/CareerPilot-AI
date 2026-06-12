@@ -99,10 +99,17 @@ Latest Phase 2 parallel execution check on 2026-06-11:
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs/evaluation_results.csv`.
 - A fallback workflow smoke test showed `PhaseTwoParallelNode`, both Phase 2 nodes, and exactly one final report trace entry.
 
+Latest README screenshot capture on 2026-06-12:
+
+- Added README screenshots under `docs/assets/`.
+- `docs/assets/careerpilot-home.png` shows the initial Streamlit input screen with DeepSeek settings and the Phase 2 tabs.
+- `docs/assets/careerpilot-sample-input.png` shows the sample resume and AI Intern job description loaded through the sidebar.
+- `tools/capture_streamlit_screenshot.mjs` starts Streamlit, opens local Chrome headless through DevTools, waits for real Streamlit text instead of the loading skeleton, and writes both PNGs.
+- Use the `node tools\capture_streamlit_screenshot.mjs` command documented in `README.md` to regenerate screenshots after UI changes.
+
 Not fully verified yet:
 
 - DeepSeek thinking mode with high reasoning effort is verified for a direct smoke test, but full multi-node workflow can be slow and should be used selectively.
-- README screenshot capture is still pending. It was attempted on 2026-06-11, but the in-app browser failed at its sandbox boundary and local Playwright/Selenium packages were unavailable.
 
 ## Local Web App Notes
 
@@ -195,5 +202,6 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Add README screenshots or a demo GIF now that the manual UI flow is verified.
-2. Consider SQLite run history if persistent local history is still desired.
+1. Consider SQLite run history if persistent local history is still desired.
+2. Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+3. Optionally add a short demo GIF if the README needs a walkthrough.

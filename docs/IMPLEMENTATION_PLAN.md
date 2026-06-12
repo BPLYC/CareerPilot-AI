@@ -192,7 +192,6 @@ Verified:
 Not yet fully verified because of current environment limits:
 
 - DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
-- README screenshot capture is still pending. It was attempted on 2026-06-11, but the in-app browser failed at its sandbox boundary and local Playwright/Selenium packages were unavailable.
 
 ## Remaining Work
 
@@ -223,7 +222,7 @@ Near-term MVP follow-up:
 - Keep `.env` configured with `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`, `DEEPSEEK_THINKING`, and `DEEPSEEK_REASONING_EFFORT`.
 - Start the Streamlit app with `.venv\Scripts\python.exe -m streamlit run app.py`.
 - Use non-thinking mode for the local demo path unless the user specifically wants slower reasoning output.
-- Add screenshots or a demo GIF after the UI is verified.
+- README screenshots were captured on 2026-06-12 with local Chrome headless and added under `docs/assets/`.
 
 Phase 2 follow-up:
 
@@ -233,7 +232,6 @@ Phase 2 follow-up:
 
 Known technical debt:
 
-- README screenshots or a demo GIF are still pending because Codex's in-app browser could not be started in the latest check.
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
 
 Resolved during current stabilization:
@@ -260,6 +258,7 @@ Resolved during current stabilization:
 - [x] Verification: Manual Streamlit UI Flow With Custom Application Questions
 - [x] Phase 2 Evaluation Metrics Expansion
 - [x] Phase 2: Parallel Application And Interview Execution
+- [x] README Screenshots
 
 ### Completed: Initial MVP Implementation
 
@@ -406,7 +405,7 @@ Verification:
 - `http://127.0.0.1:8501` returned HTTP 200 from an already-running Streamlit server.
 - Manual UI verification passed after the user reran sample data with optional application questions. The Application & Interview tab showed Application Answer Starters, Custom Application Questions, Interview Practice, and safety notices.
 
-Next: Add README screenshots or a demo GIF, or consider SQLite run history if persistent local history remains useful.
+Next: README screenshots were completed later on 2026-06-12; consider SQLite run history if persistent local history remains useful.
 
 ### Completed: Phase 2 Evaluation Metrics Expansion
 
@@ -433,9 +432,9 @@ Verification:
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 - `http://127.0.0.1:8501` returned HTTP 200 after starting Streamlit with the documented `PATH` workaround.
 
-Note: README screenshot capture remains pending. The in-app browser failed at its sandbox boundary on 2026-06-11, and local Playwright/Selenium packages were not installed, so this slice moved to the next near-term task instead of fabricating screenshot assets.
+Note: README screenshot capture was still pending during this slice because the in-app browser failed at its sandbox boundary on 2026-06-11. It was completed later on 2026-06-12 using local Chrome headless.
 
-Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+Next: Consider SQLite run history if persistent local history is still desired, or add the full Baseline vs LLM-only vs CareerPilot Full comparison.
 
 ### Completed: Phase 2 Parallel Application And Interview Execution
 
@@ -462,7 +461,7 @@ Verification:
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv`.
 - A fallback workflow smoke test showed `PhaseTwoParallelNode`, `ApplicationAnswerNode`, `InterviewCoachNode`, and exactly one `FinalReportNode` trace entry.
 
-Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+Next: README screenshots were completed later on 2026-06-12; consider SQLite run history or the full comparison evaluation.
 
 ### Completed: RAG Chroma Dependency Cleanup
 
@@ -492,7 +491,7 @@ Verification:
 - `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .\.venv\Scripts\python.exe -m pytest -q` passed with 20 tests.
 - `.\.venv\Scripts\python.exe eval\run_eval.py` regenerated `outputs\evaluation_results.csv` without the old Chroma deprecation warning.
 
-Next: Add README screenshots or a demo GIF when browser capture is available, or consider SQLite run history.
+Next: README screenshots were completed later on 2026-06-12; consider SQLite run history or the full comparison evaluation.
 
 ### Current User Action Checklist
 
@@ -515,5 +514,31 @@ The sample-data Streamlit UI flow has been manually verified, including optional
 
 Current next work options:
 
-- Add README screenshots or a demo GIF.
 - Consider SQLite local run history if persistent local history is still desired.
+- Add full Baseline vs LLM-only vs CareerPilot Full comparison.
+- Add an optional demo GIF if a short walkthrough would help the README.
+
+### Completed: README Screenshots
+
+Date: 2026-06-12
+
+Summary: Added README demo screenshots for the initial input screen and the sample-data-loaded Streamlit state. Because the Codex in-app browser still fails at its sandbox boundary on this machine, the capture path uses local Chrome headless through a small DevTools script instead of the in-app browser.
+
+Files changed:
+
+- `README.md`
+- `docs/assets/careerpilot-home.png`
+- `docs/assets/careerpilot-sample-input.png`
+- `tools/capture_streamlit_screenshot.mjs`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/PROJECT_SPEC.md`
+- `AGENTS.md`
+
+Verification:
+
+- `tools/capture_streamlit_screenshot.mjs` started Streamlit at `http://127.0.0.1:8501`.
+- Local Chrome headless waited for real Streamlit text before capturing, avoiding the loading skeleton.
+- Generated `docs/assets/careerpilot-home.png` at 1440x1200.
+- Generated `docs/assets/careerpilot-sample-input.png` at 1440x1200.
+
+Next: Consider SQLite run history if persistent local history is still desired, or add the full Baseline vs LLM-only vs CareerPilot Full comparison.
