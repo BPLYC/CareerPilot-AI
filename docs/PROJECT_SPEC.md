@@ -59,18 +59,25 @@ Current status: Phase 1 is complete enough for local demo use, dependencies are 
 
 Goal: richer application preparation workflow after the MVP is verified.
 
-Planned:
+Implemented:
 
-- ApplicationAnswerNode. First conservative drafting slice is implemented.
-- InterviewCoachNode. First interview practice slice is implemented.
-- Optional user-provided application questions with sensitive-question refusal are implemented.
-- Role-specific fallback interview questions and project follow-ups are implemented.
-- Parallel application and interview nodes are implemented.
-- Full DOCX polish.
-- SQLite local run history summaries are implemented.
-- Full comparison evaluation is implemented: Baseline vs LLM-only vs CareerPilot Full.
-- Demo GIF and screenshots.
-- More complete UI verification and README assets.
+- Conservative ApplicationAnswerNode drafting.
+- InterviewCoachNode practice questions.
+- Optional user-provided application questions with sensitive-question refusal.
+- Role-specific fallback interview questions and project follow-ups.
+- Parallel application and interview nodes with a final-report join.
+- Basic DOCX text extraction through `python-docx`.
+- SQLite local run history summaries.
+- Full comparison evaluation: Baseline vs LLM-only vs CareerPilot Full.
+- README screenshots and repeatable local Chrome capture tooling.
+- Manual sample-data UI verification.
+
+Remaining quality work:
+
+- Focused Streamlit UI polish based on manual testing.
+- Parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+- Expanded tests for real LLM schema failures and end-to-end UI workflows.
+- Optional short demo GIF.
 
 ## Implementation Decisions
 
@@ -312,8 +319,8 @@ Completed in source code:
 - SQLite-backed run history summaries that do not persist raw resumes or raw job descriptions.
 - Structured-output normalization for common real DeepSeek schema drift.
 - Cache key versioning to prevent stale pre-fix workflow states from reappearing in the UI.
-- README.
-- Basic tests.
+- README screenshots and repeatable screenshot capture tooling.
+- Basic tests, including run-history and comparison-evaluation coverage.
 
 Verified:
 
@@ -325,16 +332,20 @@ Verified:
 - Full DeepSeek-backed sample workflow succeeded with default `deepseek-v4-pro`, thinking disabled, low effort configuration and `errors=0`.
 - ChromaDB vectorstore files exist under `data/vectorstore/`.
 - `get_or_build_vectorstore()` returned a `Chroma` object with the standalone `langchain-chroma` integration.
+- README screenshots were captured on 2026-06-12 with local Chrome headless and stored under `docs/assets/`.
 
 Not yet fully verified:
 
 - DeepSeek thinking enabled with high reasoning effort is verified for a direct smoke test, but full multi-node workflow is slow and should be used selectively.
-- README screenshots were captured on 2026-06-12 with local Chrome headless and stored under `docs/assets/`.
+- Parser-specific edge cases for TXT, PDF, and DOCX uploads do not yet have dedicated automated coverage.
+- Real LLM schema failures and end-to-end Streamlit workflows need broader automated coverage.
 
 ## Near-Term Priorities
 
 1. Improve Streamlit polish based on manual UI testing.
-2. Optionally add a short demo GIF.
+2. Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+3. Expand tests for real LLM schema failures and end-to-end UI workflows.
+4. Optionally add a short demo GIF.
 
 ## Manual UI Verification
 
@@ -347,13 +358,15 @@ User checklist:
 
 - Click `Load Sample Data`.
 - Click `Run CareerPilot Analysis`.
-- Review Input, Match Report, Resume Tips, Application & Interview, and Workflow Trace.
+- Review Input, Match Report, Resume Tips, Application & Interview, Workflow Trace, and Run History.
 - Check that generated text does not invent resume facts, unsupported metrics, visa status, work authorization, sponsorship details, or compensation expectations.
 - If the trace shows `Fallback scoring completed` after recent code changes, rerun the analysis. The app now versions cache keys so old pre-fix cached states are not reused.
 
 ## Known Technical Debt
 
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
+- File upload parsers have basic implementation coverage but need dedicated edge-case tests.
+- Real LLM schema failures and end-to-end UI workflows need broader automated coverage.
 
 ## Safety And Privacy
 

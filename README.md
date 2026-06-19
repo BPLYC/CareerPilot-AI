@@ -144,6 +144,9 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Future Work
 
+- Focused Streamlit UI polish based on manual testing.
+- Parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+- Expanded tests for real LLM schema failures and end-to-end UI workflows.
 - Optional demo GIF.
 
 ## Resume Bullet For This Project

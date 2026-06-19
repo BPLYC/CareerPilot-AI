@@ -141,19 +141,28 @@ Document setup, architecture, workflow, RAG, evaluation, safety, limitations, an
 
 ## Phase 2 Plan
 
-- ApplicationAnswerNode. First deterministic/LLM-compatible slice implemented.
-- InterviewCoachNode. First deterministic/LLM-compatible slice implemented.
-- Custom application questions with sensitive-question refusal implemented.
-- Role-specific interview practice and project follow-up fallback questions implemented.
-- Parallel application and interview nodes implemented.
-- Full DOCX polish.
-- SQLite result persistence.
-- Baseline vs LLM-only vs CareerPilot Full evaluation.
-- Demo GIF and screenshots.
+Implemented:
+
+- ApplicationAnswerNode deterministic/LLM-compatible drafting.
+- InterviewCoachNode deterministic/LLM-compatible practice questions.
+- Custom application questions with sensitive-question refusal.
+- Role-specific interview practice and project follow-up fallback questions.
+- Parallel application and interview nodes with a final-report join.
+- Basic DOCX text extraction through `python-docx`.
+- SQLite summary-only run history.
+- Baseline vs LLM-only vs CareerPilot Full comparison evaluation.
+- README screenshots and repeatable local Chrome capture tooling.
+
+Remaining quality work:
+
+- Focused Streamlit UI polish based on manual testing.
+- Parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+- Expanded tests for real LLM schema failures and end-to-end UI workflows.
+- Optional short demo GIF.
 
 ## Current Status
 
-The MVP is implemented and locally stabilized. Phase 2 application/interview expansion, evaluation metrics, RAG dependency cleanup, and parallel Phase 2 execution are implemented. The project is still a local demo rather than a production service.
+The MVP is implemented and locally stabilized. Phase 2 application/interview expansion, evaluation metrics, RAG dependency cleanup, parallel execution, summary-only run history, comparison evaluation, and README screenshots are implemented. The project is still a local demo rather than a production service.
 
 Completed in code:
 
@@ -176,6 +185,9 @@ Completed in code:
 - Expanded evaluation metrics for keyword coverage delta, application answer evidence, sensitive-question refusal, and interview prep coverage.
 - RAG Chroma integration migrated from deprecated `langchain_community.vectorstores.Chroma` to `langchain_chroma.Chroma`.
 - Phase 2 application answer and interview prep nodes now run in parallel and join before final report.
+- SQLite-backed run history summaries that do not persist raw resumes or raw job descriptions.
+- Baseline vs LLM-only vs CareerPilot Full comparison evaluation with per-case and method-level CSV output.
+- README screenshots and repeatable local Chrome capture tooling.
 
 Verified:
 
@@ -210,7 +222,8 @@ Immediate execution plan:
 - [x] Fill `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL`.
 - [x] Run `streamlit run app.py`.
 - [x] Use the sample data loader and run one AI Intern analysis in the UI.
-- [x] Confirm all tabs render: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
+- [x] Confirm the original five tabs render: Input, Match Report, Resume Tips, Application & Interview, Workflow Trace.
+- [ ] Manually verify the newer Run History tab after at least one completed analysis.
 - [x] Rerun one real DeepSeek-backed workflow after schema normalization and inspect whether JSON parsing is stable.
 - [x] If parsing is unstable, tighten prompts or structured parsing in `src/services/structured_output.py`.
 - [x] Run `python eval/run_eval.py` after the real workflow path is verified.
@@ -226,11 +239,16 @@ Near-term MVP follow-up:
 
 Phase 2 follow-up:
 
-- Expand tests around real LLM parsing failures and UI workflows.
+- Do focused Streamlit UI polish based on manual testing.
+- Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+- Expand tests around real LLM parsing failures and end-to-end UI workflows.
+- Optionally add a short demo GIF.
 
 Known technical debt:
 
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
+- File upload parsers have basic implementation coverage but need dedicated edge-case tests.
+- Real LLM schema failures and end-to-end UI workflows need broader automated coverage.
 
 Resolved during current stabilization:
 
@@ -515,6 +533,8 @@ The sample-data Streamlit UI flow has been manually verified, including optional
 Current next work options:
 
 - Do focused Streamlit UI polish based on manual testing.
+- Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+- Expand tests around real LLM parsing failures and end-to-end UI workflows.
 - Add an optional demo GIF if a short walkthrough would help the README.
 
 ### Completed: README Screenshots

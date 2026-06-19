@@ -224,5 +224,6 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 ## Near-Term Next Work
 
 1. Do focused Streamlit UI polish based on manual testing.
-2. Optionally add a short demo GIF if the README needs a walkthrough.
-3. Expand tests around real LLM parsing failures and UI workflows.
+2. Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
+3. Expand tests around real LLM parsing failures and end-to-end UI workflows.
+4. Optionally add a short demo GIF if the README needs a walkthrough.
