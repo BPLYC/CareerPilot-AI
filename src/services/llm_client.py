@@ -43,8 +43,8 @@ def get_llm(model: str = "", temperature: float = 0.3):
         "model": config.model,
         "api_key": config.api_key,
         "base_url": config.base_url,
-        "max_retries": 2,
-        "request_timeout": 60,
+        "max_retries": config.max_retries,
+        "request_timeout": config.request_timeout,
     }
     if thinking_enabled:
         kwargs["reasoning_effort"] = config.reasoning_effort

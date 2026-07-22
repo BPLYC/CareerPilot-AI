@@ -47,15 +47,32 @@ def _merge_state(state: dict, update: dict) -> dict:
     return merged
 
 
-def _run_phase_two_parallel(state: dict) -> list[tuple[str, dict]]:
-    phase_two_nodes = [
-        ("application_answer", application_answer_node),
-        ("interview_coach", interview_coach_node),
-    ]
+def _run_in_parallel(state: dict, nodes: list[tuple[str, object]]) -> list[tuple[str, dict]]:
+    """Run independent nodes concurrently against a snapshot of the state.
+
+    Each node gets its own copy so none can observe another's partial writes.
+    Results come back in the declared order rather than completion order, which
+    keeps the trace stable between runs.
+    """
+
     base_state = dict(state)
-    with ThreadPoolExecutor(max_workers=len(phase_two_nodes)) as executor:
-        futures = [(name, executor.submit(node, dict(base_state))) for name, node in phase_two_nodes]
+    with ThreadPoolExecutor(max_workers=len(nodes)) as executor:
+        futures = [(name, executor.submit(node, dict(base_state))) for name, node in nodes]
         return [(name, future.result()) for name, future in futures]
+
+
+# resume_parser reads raw_resume_text and jd_analyzer reads raw_jd_text. Neither
+# looks at the other's output, so running them in sequence spent two round trips
+# where one would do.
+INTAKE_NODES = [
+    ("resume_parser", resume_parser_node),
+    ("jd_analyzer", jd_analyzer_node),
+]
+
+PHASE_TWO_NODES = [
+    ("application_answer", application_answer_node),
+    ("interview_coach", interview_coach_node),
+]
 
 
 def stream_workflow(initial_state: dict):
@@ -98,13 +115,12 @@ def _stream_graph(initial_state: dict):
 
 def _stream_sequential(initial_state: dict):
     state = dict(initial_state)
-    sequence = [
-        ("resume_parser", resume_parser_node),
-        ("jd_analyzer", jd_analyzer_node),
-        ("rag_retriever", rag_retriever_node),
-        ("match_scoring", match_scoring_node),
-    ]
-    for name, node in sequence:
+
+    for name, update in _run_in_parallel(state, INTAKE_NODES):
+        state = _merge_state(state, update)
+        yield {name: state}
+
+    for name, node in [("rag_retriever", rag_retriever_node), ("match_scoring", match_scoring_node)]:
         update = node(state)
         state = _merge_state(state, update)
         yield {name: state}
@@ -130,7 +146,7 @@ def _stream_sequential(initial_state: dict):
         state = _merge_state(state, update)
         yield {"phase_two_parallel": state}
 
-        for name, update in _run_phase_two_parallel(state):
+        for name, update in _run_in_parallel(state, PHASE_TWO_NODES):
             state = _merge_state(state, update)
             yield {name: state}
 
@@ -164,7 +180,7 @@ def run_sequential_workflow(initial_state: dict) -> dict:
 
 def build_graph():
     try:
-        from langgraph.graph import END, StateGraph
+        from langgraph.graph import END, START, StateGraph
 
         from src.workflow.state import CareerPilotState
     except ImportError:
@@ -183,9 +199,11 @@ def build_graph():
     workflow.add_node("interview_coach", interview_coach_node)
     workflow.add_node("final_report", final_report_node)
 
-    workflow.set_entry_point("resume_parser")
-    workflow.add_edge("resume_parser", "jd_analyzer")
-    workflow.add_edge("jd_analyzer", "rag_retriever")
+    # Fan out to both intake nodes and join at rag_retriever, which is the first
+    # node that needs jd_analyzer's output.
+    workflow.add_edge(START, "resume_parser")
+    workflow.add_edge(START, "jd_analyzer")
+    workflow.add_edge(["resume_parser", "jd_analyzer"], "rag_retriever")
     workflow.add_edge("rag_retriever", "match_scoring")
     workflow.add_edge("resume_optimizer", "reflection")
     workflow.add_edge("phase_two_parallel", "application_answer")

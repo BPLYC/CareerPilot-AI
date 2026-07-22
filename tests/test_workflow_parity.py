@@ -43,6 +43,16 @@ NODE_NAMES = [
 ]
 
 
+def careerpilot_stream(state: dict) -> list[dict]:
+    return list(stream_workflow(state))
+
+
+def _sequential_events(state: dict) -> list[dict]:
+    from src.workflow.careerpilot_graph import _stream_sequential
+
+    return list(_stream_sequential(state))
+
+
 def _nodes_visited(state: dict) -> set[str]:
     trace = " || ".join(state.get("workflow_trace", []))
     return {name for name in NODE_NAMES if name in trace}
@@ -123,7 +133,9 @@ def test_stream_workflow_uses_the_compiled_graph(monkeypatch):
     events = list(careerpilot_graph.stream_workflow(create_initial_state(STRONG_RESUME, STRONG_JD)))
     node_names = [next(iter(event)) for event in events]
 
-    assert node_names[0] == "resume_parser"
+    # The two intake nodes run concurrently, so their order relative to each
+    # other is not defined. Only their position before rag_retriever is.
+    assert set(node_names[:2]) == {"resume_parser", "jd_analyzer"}
     assert node_names[-1] == "final_report"
     assert node_names.count("final_report") == 1
     assert {"phase_two_parallel", "application_answer", "interview_coach"} <= set(node_names)
@@ -137,8 +149,20 @@ def test_stream_workflow_falls_back_when_langgraph_is_missing(monkeypatch):
     events = list(careerpilot_graph.stream_workflow(create_initial_state(STRONG_RESUME, STRONG_JD)))
     node_names = [next(iter(event)) for event in events]
 
-    assert node_names[0] == "resume_parser"
+    assert set(node_names[:2]) == {"resume_parser", "jd_analyzer"}
     assert node_names[-1] == "final_report"
+
+
+def test_intake_nodes_run_before_retrieval_on_both_engines():
+    """resume_parser and jd_analyzer are independent, but rag_retriever needs both."""
+
+    for events in (
+        careerpilot_stream(create_initial_state(STRONG_RESUME, STRONG_JD)),
+        _sequential_events(create_initial_state(STRONG_RESUME, STRONG_JD)),
+    ):
+        node_names = [next(iter(event)) for event in events]
+        assert set(node_names[:2]) == {"resume_parser", "jd_analyzer"}
+        assert node_names[2] == "rag_retriever"
 
 
 def test_each_streamed_event_carries_the_accumulated_state():

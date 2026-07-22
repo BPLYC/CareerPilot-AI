@@ -480,3 +480,79 @@ errors=0
 
 10 个节点顺序正确，`FinalReportNode` 恰好一次，无任何「Fallback used.」标记。
 
+## Slice 5: 并行化 intake 节点与可配置超时
+
+### 动机
+
+`resume_parser_node` 读 `raw_resume_text`，`jd_analyzer_node` 读 `raw_jd_text`，
+两者都不读对方的输出。但工作流串行执行它们，在 LLM 路径上白白多花一次网络往返。
+项目在 Phase 2 已经证明并行模式可行，这里只是把同一手法用到 intake 阶段。
+
+另外 `llm_client.py` 中的 `max_retries=2` 与 `request_timeout=60` 是硬编码的。
+项目文档反复记录「thinking 模式配 high reasoning effort 很慢，应谨慎使用」——
+而使这一配置可用的关键旋钮却必须改源码才能调整。
+
+### 改动
+
+- 把原先只服务 Phase 2 的 `_run_phase_two_parallel()` 泛化为
+  `_run_in_parallel(state, nodes)`，两处并行点共用。每个节点拿到状态的独立副本，
+  结果按声明顺序返回而非完成顺序，以保证 trace 在多次运行间稳定。
+- LangGraph 路径：从 `START` 扇出到两个 intake 节点，在 `rag_retriever` 处 join
+  （它是第一个需要 `jd_analyzer` 输出的节点）。
+- 顺序执行器路径：改用 `_run_in_parallel`。
+- `request_timeout` 与 `max_retries` 提升为 `ProviderConfig` 字段，可由
+  `DEEPSEEK_REQUEST_TIMEOUT` / `DEEPSEEK_MAX_RETRIES` 配置，默认值与原硬编码值
+  相同。非法值（空、非数字、零、负数、小数）回退到默认值 —— `.env` 里的一个笔误
+  不应该静默产生零超时，那会让每个请求都瞬间失败。
+
+### 一条过度约束的测试
+
+slice 4 写的 `test_stream_workflow_uses_the_compiled_graph` 断言
+`node_names[0] == "resume_parser"`，并行化后失败，实际首个事件变成了
+`jd_analyzer`。
+
+这是**测试写得过度具体**，不是实现错误：并行节点之间本就没有确定的先后顺序，
+断言具体哪个先到是在测试一个不存在的契约。已改为断言前两个事件的集合等于
+`{resume_parser, jd_analyzer}`，并新增一条测试确认二者都在 `rag_retriever`
+之前完成 —— 那才是真正需要保证的约束。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+55 passed in 1.81s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL
+```
+
+真实 DeepSeek 耗时对比（预算闸退出码 0，余额 5.68 元）。同一进程内先后测量，
+输入相同：
+
+```text
+sequential (old behaviour): 7.45s
+parallel   (new behaviour): 4.23s
+
+speedup: 1.76x, saved 3.22s
+
+sequential traces:
+   ResumeParserNode: Extracted 3 projects, 9 skills, 1 work experiences.
+   JDAnalyzerNode: Identified 4 required skills, 4 preferred skills, 6 keywords.
+  fell back: 0
+parallel traces:
+   ResumeParserNode: Extracted 3 projects, 9 skills, 1 work experiences.
+   JDAnalyzerNode: Identified 5 required skills, 4 preferred skills, 4 keywords.
+  fell back: 0
+```
+
+两种模式下都没有节点退回确定性路径。
+
+必须说明的是，**这是单次测量，不是基准测试**。网络延迟波动可能达到秒级，
+1.76x 这个数字不应被当作精确值引用。可以确定的只是量级：省下的时间约等于一次
+LLM 往返，这与「两次串行调用变成两次并发调用」的预期一致。两次 `jd_analyzer`
+调用返回的技能数不同（4 vs 5），是 LLM 本身的非确定性，与并行化无关。
+
