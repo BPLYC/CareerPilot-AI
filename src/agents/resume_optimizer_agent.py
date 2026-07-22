@@ -2,7 +2,7 @@
 
 from src.agents.common import invoke_structured_list, run_node
 from src.models.schemas import BulletSuggestion
-from src.services.prompts import RESUME_OPTIMIZER_SYSTEM
+from src.services.prompts import RESUME_OPTIMIZER_SYSTEM, context_block
 from src.services.structured_output import model_to_dict, validate_dict
 
 
@@ -53,8 +53,13 @@ def resume_optimizer_node(state) -> dict:
         user_prompt = (
             "Return a JSON array of BulletSuggestion objects. "
             "Use only facts from the resume profile. Do not add unsupported numbers.\n"
-            f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\nMatch report: {match_report}\n"
-            f"RAG context: {state.get('retrieved_context', {})}\nReflection feedback: {feedback}"
+            + context_block(
+                resume_profile=resume_profile,
+                jd_analysis=jd_analysis,
+                match_report=match_report,
+                rag_context=state.get("retrieved_context", {}),
+                reflection_feedback=feedback,
+            )
         )
         raw = invoke_structured_list(RESUME_OPTIMIZER_SYSTEM, user_prompt, "bullet suggestions")
         return [model_to_dict(validate_dict(BulletSuggestion, item)) for item in raw]

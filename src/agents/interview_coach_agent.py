@@ -2,7 +2,7 @@
 
 from src.agents.common import invoke_structured_list, run_node
 from src.models.schemas import InterviewQuestion
-from src.services.prompts import INTERVIEW_COACH_SYSTEM
+from src.services.prompts import INTERVIEW_COACH_SYSTEM, context_block
 from src.services.structured_output import model_to_dict, validate_dict
 
 
@@ -127,7 +127,11 @@ def interview_coach_node(state) -> dict:
             "Return a JSON array of InterviewQuestion objects with question, focus_area, and prep_notes. "
             "Questions must include role-specific technical practice and project deep-dive follow-ups "
             "grounded in the resume/JD evidence.\n"
-            f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\nRAG context: {retrieved_context}"
+            + context_block(
+                resume_profile=resume_profile,
+                jd_analysis=jd_analysis,
+                rag_context=retrieved_context,
+            )
         )
         raw = invoke_structured_list(INTERVIEW_COACH_SYSTEM, user_prompt, "interview questions")
         return [model_to_dict(validate_dict(InterviewQuestion, item)) for item in raw]

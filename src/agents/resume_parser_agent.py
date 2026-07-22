@@ -5,14 +5,9 @@ import re
 from src.agents.common import invoke_structured, run_node
 from src.models.schemas import ProjectExperience, ResumeProfile, WorkExperience
 from src.services.prompts import RESUME_PARSER_SYSTEM, schema_instruction
+from src.services.skill_taxonomy import find_known_skills
 from src.services.structured_output import model_to_dict
 from src.utils.text_utils import clean_text, truncate_text, unique_preserve_order
-
-KNOWN_SKILLS = [
-    "Python", "SQL", "scikit-learn", "pandas", "NumPy", "Git", "Flask", "Matplotlib",
-    "PyTorch", "TensorFlow", "Docker", "Tableau", "Java", "C++", "NLP", "React",
-    "FastAPI", "SQLite", "REST API", "Power BI", "Airflow", "Spark", "AWS", "GCP",
-]
 
 
 def _extract_name(text: str) -> str:
@@ -27,7 +22,7 @@ def fallback_parse_resume(text: str) -> dict:
     cleaned = clean_text(text)
     email_match = re.search(r"[\w.\-+]+@[\w.\-]+\.\w+", cleaned)
     phone_match = re.search(r"(\+?\d[\d\-\s()]{7,}\d)", cleaned)
-    skills = unique_preserve_order(skill for skill in KNOWN_SKILLS if skill.lower() in cleaned.lower())
+    skills = unique_preserve_order(find_known_skills(cleaned))
 
     projects = []
     project_patterns = [

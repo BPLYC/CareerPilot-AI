@@ -3,9 +3,9 @@
 import re
 
 from src.agents.common import invoke_structured, run_node
-from src.agents.resume_parser_agent import KNOWN_SKILLS
 from src.models.schemas import JobDescriptionAnalysis
 from src.services.prompts import JD_ANALYZER_SYSTEM, schema_instruction
+from src.services.skill_taxonomy import find_known_skills
 from src.services.structured_output import model_to_dict
 from src.utils.text_utils import clean_text, unique_preserve_order
 
@@ -13,7 +13,7 @@ from src.utils.text_utils import clean_text, unique_preserve_order
 def fallback_analyze_jd(text: str) -> dict:
     cleaned = clean_text(text)
     lower = cleaned.lower()
-    skills = unique_preserve_order(skill for skill in KNOWN_SKILLS if skill.lower() in lower)
+    skills = unique_preserve_order(find_known_skills(lower))
     sentences = [sentence.strip() for sentence in re.split(r"[.\n]", cleaned) if sentence.strip()]
     preferred = []
     required = []

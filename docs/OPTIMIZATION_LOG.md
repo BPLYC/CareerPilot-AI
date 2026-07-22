@@ -287,3 +287,100 @@ $ pytest --basetemp=.pytest_tmp
 
 DeepSeek 余额：未发生调用，本 slice 不产生费用。
 
+## Slice 3: 模块边界与 prompt JSON 序列化
+
+### 更正一处此前的判断
+
+在设计文档中，把「prompt 里插入 Python dict repr」列为浪费 token 的问题。实测后
+确认**这个判断是错的**：
+
+```text
+resume_profile: repr=1105 chars, json=1105 chars
+jd_analysis:    repr=598 chars,  json=598 chars
+match_report:   repr=437 chars,  json=437 chars
+```
+
+单引号与双引号长度相同，字符数完全一致。token 成本不是这里的问题。
+
+### 真正的问题
+
+问题在于格式一致性。所有 system prompt 都以「Return strict JSON only」结尾，
+而 user prompt 递给模型的是 **不合法的 JSON**：
+
+```text
+valid JSON when parsed as-is?
+  resume_profile: NO -> Expecting property name enclosed in double quotes: line 1 column 2
+  jd_analysis:    NO -> Expecting property name enclosed in double quotes: line 1 column 2
+```
+
+样本数据中出现 220 处单引号。更麻烦的是含撇号的值会让 repr 在同一个对象内部
+切换引号风格：
+
+```text
+repr: {'note': "the applicant's project", 'score': None, 'verified': True}
+json: {"note": "the applicant's project", "score": null, "verified": true}
+```
+
+简历文本中撇号极其常见（"Dean's List"、"Master's degree"），因此这不是理论
+边界情况。要求模型输出严格 JSON，却拿引号风格不一致的 Python 字面量做示范，与
+项目文档中反复记录的 schema drift 存在合理的因果关系。
+
+`None` / `True` 与 JSON 的 `null` / `true` 的差异在当前样本中未出现（计数为 0），
+但一旦有可选字段为空即会出现。
+
+### 改动
+
+- 新增 `src/services/prompts.context_block(**sections)`，将命名段落统一渲染为
+  JSON。4 个节点（`match_scoring`、`resume_optimizer`、`application_answer`、
+  `interview_coach`）的 prompt 拼装改用它。字符串按原样传递，不做多余引号包裹。
+- 新增 `src/services/skill_taxonomy.py`，承载 `KNOWN_SKILLS` 与
+  `find_known_skills()`。此前该常量定义在 `resume_parser_agent.py`，由
+  `jd_analyzer_agent.py` 反向 import —— 一个 agent 为了共享领域数据而依赖另一个
+  agent。两个 agent 现在都从新模块获取。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+39 passed in 1.79s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL - behaviour preserved
+```
+
+新增 8 个测试（`tests/test_prompts.py`），断言渲染结果确实可被 `json.loads`
+解析、撇号不再切换引号风格、不可序列化的值不会抛异常、以及技能表的行为。
+
+真实 DeepSeek 端到端验证（预算闸退出码 0，余额 5.82 元）：
+
+```text
+model=deepseek-v4-pro thinking=disabled effort=low
+ResumeParserNode: Extracted 3 projects, 9 skills, 1 work experiences.
+JDAnalyzerNode: Identified 4 required skills, 4 preferred skills, 6 keywords.
+RAGRetrieverNode: Retrieved 8 knowledge snippets from local knowledge base.
+MatchScoringNode: Score = 65/100. 9 matched skills, 4 missing skills.
+ResumeOptimizerNode (Iteration 0): Generated 10 bullet suggestions.
+ReflectionNode (Iteration 0): 0 issue(s) found. Finalizing.
+PhaseTwoParallelNode: Running application answers and interview coaching in parallel.
+ApplicationAnswerNode: Drafted conservative application answer starters.
+InterviewCoachNode: Generated 10 interview practice questions.
+FinalReportNode: Analysis complete. Report ready.
+errors=0
+score=65  bullets=10  interview_questions=10  custom_answers=1
+```
+
+关键证据不是 `errors=0`，而是 **10 条 trace 中没有任何一条包含
+「Fallback used.」**。slice 2 的统一骨架规定：LLM 分支一旦失败即改用确定性
+fallback 并在 trace 中标记。因此这次运行证明 6 个 LLM 节点全部成功解析了结构化
+输出，没有任何一个静默退化 —— 这正是 JSON 化 prompt 想要达到的效果。
+
+需要说明的是，单次运行无法证明 schema drift 已被消除，只能证明未引入回归。
+真正的判据需要多次运行的统计，而在当前预算下不划算。
+
+本次运行的余额变化：调用前 5.82 元，调用后读数仍为 5.82 元 —— DeepSeek 账单结算
+有延迟，单次调用的费用尚未落账。本 slice 实际累计消耗见下一 slice 的读数。
+

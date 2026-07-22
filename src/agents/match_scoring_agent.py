@@ -2,7 +2,7 @@
 
 from src.agents.common import invoke_structured, run_node
 from src.models.schemas import MatchReport
-from src.services.prompts import MATCH_SCORING_SYSTEM, schema_instruction
+from src.services.prompts import MATCH_SCORING_SYSTEM, context_block, schema_instruction
 from src.services.scoring import keyword_coverage, matched_and_missing_skills, skill_match_rate
 from src.services.structured_output import model_to_dict, validate_dict
 
@@ -76,7 +76,12 @@ def match_scoring_node(state) -> dict:
                 "MatchReport",
                 "overall_score,matched_skills,missing_skills,relevant_projects,weak_sections,explanation",
             )
-            + f"\nResume profile:\n{resume_profile}\nJD analysis:\n{jd_analysis}\nRetrieved context:\n{state.get('retrieved_context', {})}"
+            + "\n"
+            + context_block(
+                resume_profile=resume_profile,
+                jd_analysis=jd_analysis,
+                retrieved_context=state.get("retrieved_context", {}),
+            )
         )
         return invoke_structured(MatchReport, MATCH_SCORING_SYSTEM, user_prompt)
 

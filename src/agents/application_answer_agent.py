@@ -2,7 +2,7 @@
 
 from src.agents.common import invoke_structured, run_node
 from src.models.schemas import ApplicationAnswerSet, ApplicationQuestionAnswer
-from src.services.prompts import APPLICATION_ANSWER_SYSTEM, schema_instruction
+from src.services.prompts import APPLICATION_ANSWER_SYSTEM, context_block, schema_instruction
 from src.services.structured_output import model_to_dict
 
 SENSITIVE_NOTICE = (
@@ -137,9 +137,13 @@ def application_answer_node(state) -> dict:
             )
             + "\nUse only verified evidence. Do not answer sensitive eligibility questions.\n"
             + "For each requested application question, add one custom_answers item with question, answer, and review_notice.\n"
-            f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\n"
-            f"Match report: {match_report}\nApplication questions: {application_questions}\n"
-            f"RAG context: {state.get('retrieved_context', {})}"
+            + context_block(
+                resume_profile=resume_profile,
+                jd_analysis=jd_analysis,
+                match_report=match_report,
+                application_questions=application_questions,
+                rag_context=state.get("retrieved_context", {}),
+            )
         )
         return invoke_structured(ApplicationAnswerSet, APPLICATION_ANSWER_SYSTEM, user_prompt)
 
