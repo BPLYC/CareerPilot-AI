@@ -8,6 +8,7 @@ import streamlit as st
 from src.ui.sidebar import render_sidebar
 from src.ui.tabs import (
     application_tab,
+    compare_tab,
     input_tab,
     match_report_tab,
     resume_tips_tab,
@@ -20,6 +21,7 @@ TAB_LABELS = [
     "Match Report",
     "Resume Tips",
     "Application & Interview",
+    "Compare Jobs",
     "Workflow Trace",
     "Run History",
 ]
@@ -49,8 +51,10 @@ def main() -> None:
     with tabs[3]:
         application_tab.render(state)
     with tabs[4]:
-        workflow_trace_tab.render(state)
+        compare_tab.render(settings)
     with tabs[5]:
+        workflow_trace_tab.render(state)
+    with tabs[6]:
         run_history_tab.render()
 
 

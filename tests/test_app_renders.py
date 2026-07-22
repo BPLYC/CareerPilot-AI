@@ -15,6 +15,7 @@ TAB_LABELS = [
     "Match Report",
     "Resume Tips",
     "Application & Interview",
+    "Compare Jobs",
     "Workflow Trace",
     "Run History",
 ]
@@ -32,12 +33,22 @@ def test_app_renders_without_exceptions():
     assert not app.exception, [str(e) for e in app.exception]
 
 
-def test_all_six_tabs_are_present():
+def test_all_tabs_are_present():
     app = _run()
     labels = [tab.label for tab in app.tabs]
 
     for expected in TAB_LABELS:
         assert expected in labels
+
+
+def test_compare_tab_renders_its_controls():
+    app = _run()
+    button_labels = [button.label for button in app.button]
+    textarea_labels = [area.label for area in app.text_area]
+
+    assert "Compare roles" in button_labels
+    assert "Load all sample JDs" in button_labels
+    assert "Job descriptions" in textarea_labels
 
 
 def test_sidebar_offers_the_provider_controls():

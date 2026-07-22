@@ -783,3 +783,64 @@ OUTPUTS IDENTICAL
 测试数从 99 增至 117。除断言外，也实际生成并肉眼检查了完整报告 —— 上述两个缺陷
 都是这样发现的，不是靠测试发现的。
 
+## Slice 9: 多 JD 批量对比（新功能）
+
+### 动机
+
+项目定位是帮学生准备实习申请，而学生通常同时投递多个岗位。现有工作流一次只处理
+一个 JD，能回答「这个岗位合不合适」，但回答不了「这几个里哪个最值得投入时间」和
+「补哪一项技能能同时打开最多机会」。
+
+### 改动
+
+新增 `src/services/multi_jd.py`：复用现有 `run_workflow` 与缓存逐个分析，按匹配分
+排序，并计算所有岗位共同缺失的技能。不新增任何 LLM 调用模式。
+
+新增 `Compare Jobs` tab。多个 JD 用 `===` 分隔，块首写 `# 标签` 可命名。
+
+两处设计判断值得记录：
+
+**共同缺失取交集而非并集。** 并集只是「所有岗位提到过的技能」，信息量不大；交集
+才是「每个岗位都要求、而简历里都没有」的技能 —— 那才是最该优先补的一项。结果顺序
+沿用第一个岗位的列表，而不是集合的迭代顺序，以保证多次运行结果稳定。
+
+**单个岗位不计算共同缺失。** 对单个集合求交集就是它本身，作为「这些岗位都要什么」
+的答案会产生误导，因此少于两个可用岗位时返回空。
+
+**单个岗位失败不影响其余。** 每个岗位的异常被记录在该行上，失败行排在最后，不会
+占据「最佳匹配」的位置。空 JD 直接标记而不进入工作流。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+132 passed in 2.18s
+```
+
+测试数从 117 增至 132。除单元测试外，用样例数据实际跑了一次完整对比：
+
+```text
+Rank Job             Detected Role                Score  Matched  Missing  Status
+1    Data Analyst    Data Analyst Intern          79     2        1        OK
+2    SWE Intern      Software Engineering Intern  72     2        2        OK
+3    AI Intern       AI Intern                    68     2        3        OK
+
+best fit: Data Analyst (79/100)
+missing from every role: (none)
+
+Data Analyst: missing = ['Tableau']
+SWE Intern:   missing = ['Java', 'REST API']
+AI Intern:    missing = ['PyTorch', 'TensorFlow', 'NLP']
+```
+
+「missing from every role: (none)」是正确结果而非缺陷 —— 这三个岗位要求的技能确实
+没有交集。UI 对这种情况有单独的说明文案。
+
+顺带可以看到 slice 8 修复的职位名正则在这里生效：`Detected Role` 一列是干净的
+职位名，而不是整段 JD 开头。
+
+本 slice 无 API 调用，不产生费用。
+
