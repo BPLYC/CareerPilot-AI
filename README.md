@@ -23,7 +23,9 @@ Students applying for AI, data, and software internships need help understanding
 - Resume bullet suggestions grounded in the existing resume.
 - Reflection review for factual consistency.
 - Conservative application answer starters, optional application questions, and interview practice questions.
-- Parallel Phase 2 preparation so application answers and interview coaching run independently after reflection.
+- Parallel execution where the workflow allows it: resume parsing and JD analysis at intake, application answers and interview coaching after reflection.
+- Compare one resume against several job descriptions at once, ranked by fit, with the skills missing from every role.
+- Export the full report as Markdown.
 - Local Streamlit UI, workflow trace, and SQLite-backed run history summaries.
 - Comparison evaluation across Baseline, LLM-only, and CareerPilot Full methods.
 
@@ -40,8 +42,10 @@ Students applying for AI, data, and software internships need help understanding
 
 ```mermaid
 flowchart TD
-    A["Resume Parser"] --> B["JD Analyzer"]
-    B --> C["RAG Retriever"]
+    S["Start"] --> A["Resume Parser"]
+    S --> B["JD Analyzer"]
+    A --> C["RAG Retriever"]
+    B --> C
     C --> D["Match Scoring"]
     D -->|"score < 45"| E["Low Match Warning"]
     D -->|"score >= 45"| F["Resume Optimizer"]
@@ -73,7 +77,11 @@ DEEPSEEK_MODEL=deepseek-v4-pro
 DEEPSEEK_THINKING=disabled
 DEEPSEEK_REASONING_EFFORT=low
 EMBEDDING_PROVIDER=local_hash
+DEEPSEEK_REQUEST_TIMEOUT=60
+DEEPSEEK_MAX_RETRIES=2
 ```
+
+`DEEPSEEK_REQUEST_TIMEOUT` and `DEEPSEEK_MAX_RETRIES` are optional. Raise the timeout when using thinking mode with high reasoning effort, which is considerably slower than the defaults.
 
 The project can still run deterministic fallback logic without an API key. For deeper but slower analysis, switch `DEEPSEEK_THINKING=enabled` and choose `DEEPSEEK_REASONING_EFFORT=low`, `medium`, or `high`.
 The Streamlit sidebar also exposes thinking mode and reasoning effort controls for local demos.
@@ -119,10 +127,25 @@ To refresh these screenshots after UI changes, use Node.js and local Google Chro
 node tools\capture_streamlit_screenshot.mjs
 ```
 
+## Tests And Linting
+
+```powershell
+python -m pytest -q
+ruff check .
+```
+
+Tests run against the deterministic fallback path and never require an API key. GitHub Actions runs both on Python 3.11 and 3.12.
+
 ## Evaluation
 
 ```powershell
 python eval/run_eval.py
+```
+
+Evaluation runs deterministically by default: it clears the DeepSeek credentials and forces markdown retrieval, so repeated runs produce byte-identical CSVs and cost nothing. Pass `--live` to call the real model instead, which costs money and returns different numbers each run.
+
+```powershell
+python eval/run_eval.py --live
 ```
 
 The script writes `outputs/evaluation_results.csv` with one row per case and method, plus `outputs/evaluation_comparison_summary.csv` with method-level averages. Metrics include keyword coverage before and after generated bullets, required skill match rate, reflection revision rate, STAR-ready bullet coverage, application answer evidence coverage, sensitive-question refusal count, interview prep-notes coverage, project follow-up count, role-specific question count, required-skill evidence question count, RAG snippet count, workflow trace count, reflection review count, and Phase 2 parallel execution count.
@@ -144,9 +167,8 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Future Work
 
-- Focused Streamlit UI polish based on manual testing.
-- Parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
-- Expanded tests for real LLM schema failures and end-to-end UI workflows.
+- Grow the RAG knowledge base. It currently holds 8 chunks while retrieval requests 16, so every query returns everything and the `rag_snippet_count` metric does not measure retrieval quality.
+- Refresh the README screenshots, which predate the Compare Jobs tab and the report export button.
 - Optional demo GIF.
 
 ## Resume Bullet For This Project

@@ -10,9 +10,49 @@ Read these files first:
 
 - `docs/PROJECT_SPEC.md`: full consolidated product and implementation spec.
 - `docs/IMPLEMENTATION_PLAN.md`: current status, near-term plan, and progress tracking.
+- `docs/OPTIMIZATION_LOG.md`: the 2026-07 optimization round, with the evidence behind each change.
 - `README.md`: user-facing setup and run instructions.
 
+## Things That Will Waste Your Time If You Do Not Know Them
+
+- **`pytest` needs `--basetemp`** in this environment. Without it, tests using
+  `tmp_path` fail with `PermissionError` on the shared temp directory and you
+  get a misleading "25 passed, 1 error".
+- **Setting `DEEPSEEK_API_KEY=""` in the shell does not force offline mode.**
+  `provider_config` calls `load_dotenv()` at import, and python-dotenv searches
+  parent directories, so `.env` above the working directory puts the key back.
+  Use `eval.run_eval.use_deterministic_agents()`, which clears after import.
+- **`eval/run_eval.py` is deterministic by default** and takes `--live` to call
+  the real model. Do not remove that gate: before it existed, every evaluation
+  run cost money and returned different numbers.
+- **HTTP 200 from Streamlit does not verify the UI.** The server returns shell
+  HTML without executing `app.py` until a session connects. Use
+  `tests/test_app_renders.py`, which runs the script through Streamlit's
+  `AppTest`.
+- **`tests/conftest.py` clears the API key for every test.** A test meaning to
+  exercise the LLM branch must patch `src.agents.common.can_use_llm`, or it will
+  pass while testing the fallback instead.
+
 ## Current Status
+
+An optimization round completed on 2026-07-23 on branch
+`claude/project-optimization-e559bf`. Nine slices, each with its own commit and
+an entry in `docs/OPTIMIZATION_LOG.md` recording the evidence. Headlines:
+
+- The compiled LangGraph now runs; previously only a test ever invoked it.
+- Six copies of the agent LLM/fallback control flow collapsed into
+  `common.run_node()`, closing two places where the error path had drifted from
+  the success path.
+- Evaluation became reproducible and free by default; it had been calling the
+  real API on every run while documented as reproducible.
+- `app.py` split from 263 lines into `src/ui/`, and sidebar rendering no longer
+  mutates `os.environ`.
+- Intake nodes run concurrently; a live run measured 7.45s against 4.23s.
+- Tests went from 26 to 132, adding the previously uncovered parser and LLM
+  branches.
+- New: Markdown report export, and multi-JD comparison.
+
+Everything below predates that round.
 
 The MVP is implemented and locally stabilized. Phase 2 now has multiple completed slices on the normal-match path:
 
@@ -174,24 +214,49 @@ try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8501 -TimeoutSec 5 | S
 
 ## Important Entry Points
 
-- UI: `app.py`
+- UI assembly: `app.py` (44 lines; each tab lives in `src/ui/tabs/`)
+- Sidebar: `src/ui/sidebar.py`
+- Analysis run with caching: `src/ui/analysis.py`
 - Workflow: `src/workflow/careerpilot_graph.py`
+- Shared agent skeleton: `src/agents/common.py` (`run_node`)
 - State: `src/workflow/state.py`
 - Schemas: `src/models/schemas.py`
 - Provider config: `src/services/provider_config.py`
 - LLM client: `src/services/llm_client.py`
-- Prompts: `src/services/prompts.py`
+- Prompts and JSON context rendering: `src/services/prompts.py`
+- Skill taxonomy: `src/services/skill_taxonomy.py`
 - Structured output normalization: `src/services/structured_output.py`
+- Markdown export: `src/services/report_export.py`
+- Multi-JD comparison: `src/services/multi_jd.py`
 - RAG retrieval: `src/rag/retriever.py`
 - Vectorstore build: `src/rag/build_vectorstore.py`
 - Evaluation: `eval/run_eval.py`
+- Budget guard for live API runs: `tools/check_deepseek_budget.py`
+
+## Architecture Notes
+
+`careerpilot_graph.py` holds two engines. `stream_workflow()` prefers the
+compiled LangGraph and falls back to the sequential runner when langgraph is not
+installed. `tests/test_workflow_parity.py` pins them to the same results; if you
+change routing, change both and let that test tell you whether they still agree.
+
+Every LLM-backed node goes through `common.run_node()`, which owns the
+try/LLM-or-fallback/except shape. Its `refine` and `extra_state` hooks run on
+both branches deliberately: applying them only on success is how the error path
+silently drifted before.
 
 ## Commands
 
 Run tests in this environment:
 
 ```powershell
-$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; .\.venv\Scripts\python.exe -m pytest -q
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; .\.venv\Scripts\python.exe -m pytest -q --basetemp=.pytest_tmp
+```
+
+Lint:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
 ```
 
 Run evaluation:
@@ -223,7 +288,9 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Do focused Streamlit UI polish based on manual testing.
-2. Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
-3. Expand tests around real LLM parsing failures and end-to-end UI workflows.
-4. Optionally add a short demo GIF if the README needs a walkthrough.
+1. Grow the RAG knowledge base. It holds 8 chunks while `retrieve_context()`
+   requests 16, so retrieval always returns everything and the
+   `rag_snippet_count` comparison metric is not measuring retrieval quality.
+2. Regenerate the README screenshots; they predate the Compare Jobs tab and the
+   report export button.
+3. Optionally add a short demo GIF if the README needs a walkthrough.
