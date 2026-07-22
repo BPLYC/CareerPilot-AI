@@ -9,4 +9,5 @@ __pycache__/
 .venv/
 *.pyc
 .pytest_cache/
+.pytest_tmp/
 .DS_Store
