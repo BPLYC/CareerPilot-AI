@@ -1,9 +1,9 @@
 """Resume optimizer node."""
 
-from src.agents.common import can_use_llm
+from src.agents.common import invoke_structured_list, run_node
 from src.models.schemas import BulletSuggestion
 from src.services.prompts import RESUME_OPTIMIZER_SYSTEM
-from src.services.structured_output import loads_json, model_to_dict, validate_dict
+from src.services.structured_output import model_to_dict, validate_dict
 
 
 def _source_items(resume_profile: dict, match_report: dict) -> list[dict]:
@@ -48,38 +48,21 @@ def resume_optimizer_node(state) -> dict:
     match_report = state.get("match_report") or {}
     feedback = state.get("reflection_feedback", "")
     iteration = state.get("reflection_iteration", 0)
-    try:
-        if can_use_llm():
-            user_prompt = (
-                "Return a JSON array of BulletSuggestion objects. "
-                "Use only facts from the resume profile. Do not add unsupported numbers.\n"
-                f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\nMatch report: {match_report}\n"
-                f"RAG context: {state.get('retrieved_context', {})}\nReflection feedback: {feedback}"
-            )
-            raw = invoke_structured_array(user_prompt)
-            suggestions = [model_to_dict(validate_dict(BulletSuggestion, item)) for item in raw]
-        else:
-            suggestions = fallback_optimize(resume_profile, jd_analysis, match_report, feedback)
-        trace = f"ResumeOptimizerNode (Iteration {iteration}): Generated {len(suggestions)} bullet suggestions."
-        return {"optimized_bullets": suggestions, "workflow_trace": [trace]}
-    except Exception as exc:
-        suggestions = fallback_optimize(resume_profile, jd_analysis, match_report, feedback)
-        return {
-            "optimized_bullets": suggestions,
-            "errors": [f"ResumeOptimizerNode failed and used fallback optimizer: {exc}"],
-            "workflow_trace": [f"ResumeOptimizerNode (Iteration {iteration}): Fallback generated {len(suggestions)} suggestions."],
-        }
 
+    def from_llm() -> list[dict]:
+        user_prompt = (
+            "Return a JSON array of BulletSuggestion objects. "
+            "Use only facts from the resume profile. Do not add unsupported numbers.\n"
+            f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\nMatch report: {match_report}\n"
+            f"RAG context: {state.get('retrieved_context', {})}\nReflection feedback: {feedback}"
+        )
+        raw = invoke_structured_list(RESUME_OPTIMIZER_SYSTEM, user_prompt, "bullet suggestions")
+        return [model_to_dict(validate_dict(BulletSuggestion, item)) for item in raw]
 
-def invoke_structured_array(user_prompt: str) -> list[dict]:
-    from src.services.llm_client import get_llm
-
-    llm = get_llm()
-    response = llm.invoke([("system", RESUME_OPTIMIZER_SYSTEM), ("human", user_prompt)])
-    content = getattr(response, "content", response)
-    parsed = loads_json(str(content))
-    if isinstance(parsed, dict) and "items" in parsed:
-        return parsed["items"]
-    if not isinstance(parsed, list):
-        raise ValueError("Expected JSON array for bullet suggestions.")
-    return parsed
+    return run_node(
+        node_name=f"ResumeOptimizerNode (Iteration {iteration})",
+        output_key="optimized_bullets",
+        llm_branch=from_llm,
+        fallback_branch=lambda: fallback_optimize(resume_profile, jd_analysis, match_report, feedback),
+        describe=lambda bullets: f"Generated {len(bullets)} bullet suggestions.",
+    )

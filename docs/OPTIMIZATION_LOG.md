@@ -182,3 +182,108 @@ spec 中 slice 1 写明「不改动任何现有业务代码」。实际改动了
 
 改动范围控制在评估路径与检索开关上，未触及任何 agent 或工作流逻辑。
 
+## Slice 2: 统一 agent 骨架
+
+### 先更正一处此前的表述
+
+设计文档与 slice 2 的任务标题都写作「消除 10 处重复控制流」。实际逐个读过
+`src/agents/` 后确认是 **6 处**，不是 10 处。
+
+有 LLM 分支、因而复制了同一段 try/except 的节点是：`resume_parser`、
+`jd_analyzer`、`match_scoring`、`resume_optimizer`、`application_answer`、
+`interview_coach`。
+
+另外 4 个节点 —— `rag_retriever`、`low_match_warning`、`final_report`、
+`reflection` —— 是纯确定性节点，没有 LLM 调用，也没有这段样板。它们本来就不该被
+算进来。
+
+### 动机
+
+6 个节点各自手写了同一段控制流：
+
+```python
+try:
+    if can_use_llm():
+        result = <LLM 调用>
+    else:
+        result = <fallback>()
+    <可选的后处理>
+    return {key: result, "workflow_trace": [成功文案]}
+except Exception as exc:
+    result = <fallback>()
+    return {key: result, "errors": [...], "workflow_trace": [失败文案]}
+```
+
+复制粘贴的控制流真正的代价不是行数，而是**两条分支会各自漂移**。实际已经漂移了
+两处：
+
+1. `match_scoring_agent.py`：低分警告只在成功分支计算。若 LLM 调用失败、
+   fallback 打出低于 45 分的成绩，`warnings` 键根本不会出现在返回值里 ——
+   UI 上那条「这个岗位可能不适合你」的提示就消失了。
+2. `application_answer_agent.py`：`enforce_sensitive_question_boundaries()`
+   只在成功分支调用。这个函数负责把签证、担保、薪酬类问题的答案强制交还给申请人，
+   属于安全边界。错误分支绕过了它。
+
+第二处在当前代码下不产生实际危害，因为 `fallback_application_answers()` 内部
+已经对敏感问题做了处理，等价于再跑一遍。但依赖「另一个函数恰好也做了这件事」
+来保证安全边界，是不该留着的结构。
+
+### 改动
+
+`src/agents/common.py` 新增 `run_node()`，把上述控制流收敛为一处。节点退化为
+声明式配置：节点名、输出键、LLM 分支、fallback 分支、trace 描述函数，以及可选的
+`refine`（后处理）与 `extra_state`（派生状态）。
+
+关键设计决定：`refine` 与 `extra_state` **在两条分支上都执行**。这正是修复上述
+两处漂移的方式 —— 派生状态和输出净化不再依赖于「哪条分支产生了结果」。
+
+同时合并了两个近乎相同的 JSON 数组解析辅助函数
+（`invoke_structured_array` 与 `invoke_interview_array`）为
+`common.invoke_structured_list()`。
+
+### 关于行数
+
+净变化为 +214 / -179，基本持平 —— `common.py` 增加了 58 行共享骨架，抵消了
+6 个节点各自减少的样板。收益不在行数：
+
+| | 之前 | 之后 |
+| --- | --- | --- |
+| try/except/fallback 控制流副本 | 6 份 | 1 份 |
+| JSON 数组解析辅助函数 | 2 份 | 1 份 |
+| 错误路径与成功路径可能分叉 | 是 | 否 |
+
+### 验证
+
+行为保留的核心证据是评估输出逐字节不变：
+
+```text
+Mode: deterministic. Pass --live to call the real LLM.
+=== diff vs slice-1 committed CSVs ===
+OUTPUTS IDENTICAL - behaviour preserved
+```
+
+确定性路径上，重构前后的每一项指标完全相同。
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+31 passed in 1.72s
+```
+
+现有 28 个测试未作任何修改即通过。新增 3 个测试在
+`tests/test_agent_fallback.py`，用于钉住错误路径上被修正的行为 —— 因为评估的
+确定性路径不会触发 LLM 失败，覆盖不到这部分：
+
+- LLM 失败时低分警告仍然产生。
+- LLM 失败时敏感问题边界仍然强制执行。
+- `run_node()` 记录失败原因的同时仍返回可用输出。
+
+写这三个测试时，第三个一开始是失败的。原因是测试本身写错了：`tests/conftest.py`
+会清除 API key，`can_use_llm()` 返回 False，`run_node()` 因此根本没进入 LLM 分支，
+自然也不会有错误可记录。补上 `monkeypatch` 后通过 —— 也就是说，如果不显式伪造
+凭据，这类测试会在完全没有验证失败处理的情况下「通过」。
+
+DeepSeek 余额：未发生调用，本 slice 不产生费用。
+

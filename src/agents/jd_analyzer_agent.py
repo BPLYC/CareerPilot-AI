@@ -2,7 +2,7 @@
 
 import re
 
-from src.agents.common import can_use_llm, invoke_structured
+from src.agents.common import invoke_structured, run_node
 from src.agents.resume_parser_agent import KNOWN_SKILLS
 from src.models.schemas import JobDescriptionAnalysis
 from src.services.prompts import JD_ANALYZER_SYSTEM, schema_instruction
@@ -38,30 +38,31 @@ def fallback_analyze_jd(text: str) -> dict:
     return model_to_dict(analysis)
 
 
+def _describe(analysis: dict) -> str:
+    return (
+        f"Identified {len(analysis.get('required_skills', []))} required skills, "
+        f"{len(analysis.get('preferred_skills', []))} preferred skills, {len(analysis.get('keywords', []))} keywords."
+    )
+
+
 def jd_analyzer_node(state) -> dict:
     text = state.get("raw_jd_text", "")
-    try:
-        if can_use_llm():
-            user_prompt = (
-                schema_instruction(
-                    "JobDescriptionAnalysis",
-                    "job_title,company,required_skills,preferred_skills,responsibilities,keywords,education_requirements,experience_requirements,tools_and_technologies",
-                )
-                + "\nJob description:\n"
-                + text
+
+    def from_llm() -> dict:
+        user_prompt = (
+            schema_instruction(
+                "JobDescriptionAnalysis",
+                "job_title,company,required_skills,preferred_skills,responsibilities,keywords,education_requirements,experience_requirements,tools_and_technologies",
             )
-            analysis = invoke_structured(JobDescriptionAnalysis, JD_ANALYZER_SYSTEM, user_prompt)
-        else:
-            analysis = fallback_analyze_jd(text)
-        trace = (
-            f"JDAnalyzerNode: Identified {len(analysis.get('required_skills', []))} required skills, "
-            f"{len(analysis.get('preferred_skills', []))} preferred skills, {len(analysis.get('keywords', []))} keywords."
+            + "\nJob description:\n"
+            + text
         )
-        return {"jd_analysis": analysis, "workflow_trace": [trace]}
-    except Exception as exc:
-        analysis = fallback_analyze_jd(text)
-        return {
-            "jd_analysis": analysis,
-            "errors": [f"JDAnalyzerNode failed and used fallback analyzer: {exc}"],
-            "workflow_trace": ["JDAnalyzerNode: Fallback analyzer completed."],
-        }
+        return invoke_structured(JobDescriptionAnalysis, JD_ANALYZER_SYSTEM, user_prompt)
+
+    return run_node(
+        node_name="JDAnalyzerNode",
+        output_key="jd_analysis",
+        llm_branch=from_llm,
+        fallback_branch=lambda: fallback_analyze_jd(text),
+        describe=_describe,
+    )
