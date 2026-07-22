@@ -59,6 +59,44 @@ def _run_phase_two_parallel(state: dict) -> list[tuple[str, dict]]:
 
 
 def stream_workflow(initial_state: dict):
+    """Stream {node_name: state_so_far} for each node the workflow runs.
+
+    Uses the compiled LangGraph when langgraph is installed, and the sequential
+    runner below otherwise. Both are kept because the deterministic fallback has
+    to work without the dependency; tests/test_workflow_parity.py pins them to
+    the same results.
+    """
+
+    if graph is None:
+        yield from _stream_sequential(initial_state)
+        return
+    yield from _stream_graph(initial_state)
+
+
+def _stream_graph(initial_state: dict):
+    """Stream the compiled graph, pairing node names with accumulated state.
+
+    "updates" carries the node name but only that node's partial return value;
+    "values" carries the full state after LangGraph applies its own reducers.
+    Streaming both and pairing them means the accumulated state comes from
+    LangGraph rather than from a second merge implementation here.
+
+    The Phase 2 pair runs concurrently, so two "updates" arrive before the next
+    "values". Both are reported against the state that follows the join, which
+    is the first point where either node's output is actually observable.
+    """
+
+    pending: list[str] = []
+    for mode, payload in graph.stream(dict(initial_state), stream_mode=["updates", "values"]):
+        if mode == "updates":
+            pending.extend(payload)
+        elif pending:
+            for node_name in pending:
+                yield {node_name: payload}
+            pending = []
+
+
+def _stream_sequential(initial_state: dict):
     state = dict(initial_state)
     sequence = [
         ("resume_parser", resume_parser_node),
@@ -101,11 +139,27 @@ def stream_workflow(initial_state: dict):
     yield {"final_report": state}
 
 
-def run_workflow(initial_state: dict) -> dict:
-    final_state = initial_state
-    for event in stream_workflow(initial_state):
-        final_state = list(event.values())[0]
+def _final_state(events) -> dict:
+    final_state: dict = {}
+    for event in events:
+        final_state = next(iter(event.values()))
     return final_state
+
+
+def run_workflow(initial_state: dict) -> dict:
+    return _final_state(stream_workflow(initial_state)) or initial_state
+
+
+def run_sequential_workflow(initial_state: dict) -> dict:
+    """Run the workflow without LangGraph.
+
+    This is the path taken when langgraph is not installed. It needs its own
+    entry point so parity tests can compare the two engines: once stream_workflow
+    prefers the compiled graph, a test calling run_workflow would be comparing
+    the graph against itself and would pass without checking anything.
+    """
+
+    return _final_state(_stream_sequential(initial_state)) or initial_state
 
 
 def build_graph():

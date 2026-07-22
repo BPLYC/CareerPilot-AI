@@ -384,3 +384,99 @@ fallback 并在 trace 中标记。因此这次运行证明 6 个 LLM 节点全�
 本次运行的余额变化：调用前 5.82 元，调用后读数仍为 5.82 元 —— DeepSeek 账单结算
 有延迟，单次调用的费用尚未落账。本 slice 实际累计消耗见下一 slice 的读数。
 
+## Slice 4: LangGraph 归位到真实运行路径
+
+这是本轮唯一带行为变更风险的改动，仓库所有者已明确确认接受该风险。
+
+### 动机
+
+`build_graph()` 在模块加载时编译出一个 `CompiledStateGraph`，但它从未出现在任何
+真实执行路径上：
+
+- `app.py` 调用 `stream_workflow()` —— 同文件中手写的顺序执行器。
+- `comparison_evaluation.py` 的「CareerPilot Full」方法调用 `run_workflow()`，
+  它同样只是 `stream_workflow()` 的包装。
+- 编译出的 `graph` 对象只在 `tests/test_workflow.py` 的一条测试里被 invoke。
+
+也就是说，项目的核心技术卖点在生产路径上是装饰性的。更实际的代价是：路由规则、
+反射循环上限、Phase 2 扇出结构被表达了两遍，改动其中一边不会有任何测试报警。
+
+### 先写测试
+
+按 spec 要求，一致性测试先于实现改动编写，这样任何既有分歧会表现为测试失败，
+而不会被误记为「切换引擎导致的行为变化」。
+
+`tests/test_workflow_parity.py` 对同一输入分别运行两个引擎，比较用户可见的结果：
+分数、匹配/缺失技能、相关项目、bullet 数量与文本、面试题数量、申请回答键、
+自定义回答、警告、错误数、反射状态、以及 trace 中出现过的节点集合。覆盖正常匹配、
+低匹配、带自定义申请问题三种情形。
+
+刻意不比较 trace 的顺序与文案 —— 两个引擎对并行 Phase 2 节点的交错方式不同，
+这属于允许的差异。
+
+**结果：在切换之前，5 条一致性测试全部通过。** 两个引擎在确定性路径上本就一致，
+用户接受的风险没有兑现。这个结论只有先写测试才能得到；先改实现再测的话，通过
+与否都无法区分「本来就一致」和「改对了」。
+
+### 改动
+
+`stream_workflow()` 现在优先使用编译好的图，`graph is None`（langgraph 未安装）
+时降级到顺序执行器。顺序执行器保留，未删除。
+
+实现上使用 `graph.stream(..., stream_mode=["updates", "values"])` 双模式：
+`updates` 提供节点名，`values` 提供 LangGraph 自身 reducer 计算出的完整状态。
+配对两者，意味着累积状态来自 LangGraph 而非本文件里的第二套合并实现 ——
+这正是消除双重语义的关键。
+
+并行的 Phase 2 节点会连续产生两个 `updates` 后才有一个 `values`，两者都记在
+join 之后的状态上，因为那是任一节点输出真正可观测的最早时刻。
+
+### 切换过程中发现的陷阱
+
+`run_workflow()` 是 `stream_workflow()` 的包装。切换之后它也走图了，于是原先
+「`graph.invoke()` vs `run_workflow()`」的一致性测试变成了**图与自己比较**，
+会永远通过且什么都没验证。
+
+这与 slice 2 中遇到的测试失效是同一类问题：测试看起来是绿的，实际上没有测任何
+东西。修法是新增 `run_sequential_workflow()` 作为顺序执行器的显式入口，让一致性
+测试能够真正比较两个引擎。
+
+同时新增两条互为对照的测试：一条把 `_stream_sequential` 替换为抛异常的桩函数后
+仍能跑通（证明确实走图），另一条把 `graph` 设为 `None` 后仍能跑通（证明降级路径
+仍然有效）。两条都通过，说明分支是真实可区分的。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+47 passed in 1.74s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL - metrics unchanged
+```
+
+评估指标未变这一点尤其关键：`comparison_evaluation.py` 的「CareerPilot Full」
+方法现在经由 LangGraph 执行，而全部指标与切换前逐字节相同。
+
+真实 DeepSeek 端到端验证（预算闸退出码 0，余额 5.78 元）：
+
+```text
+ResumeParserNode: Extracted 3 projects, 9 skills, 1 work experiences.
+JDAnalyzerNode: Identified 4 required skills, 4 preferred skills, 6 keywords.
+RAGRetrieverNode: Retrieved 8 knowledge snippets from local knowledge base.
+MatchScoringNode: Score = 62/100. 3 matched skills, 2 missing skills.
+ResumeOptimizerNode (Iteration 0): Generated 10 bullet suggestions.
+ReflectionNode (Iteration 0): 0 issue(s) found. Finalizing.
+PhaseTwoParallelNode: Running application answers and interview coaching in parallel.
+ApplicationAnswerNode: Drafted conservative application answer starters.
+InterviewCoachNode: Generated 12 interview practice questions.
+FinalReportNode: Analysis complete. Report ready.
+errors=0
+```
+
+10 个节点顺序正确，`FinalReportNode` 恰好一次，无任何「Fallback used.」标记。
+
