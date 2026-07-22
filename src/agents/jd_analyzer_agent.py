@@ -25,7 +25,10 @@ def fallback_analyze_jd(text: str) -> dict:
         else:
             required.append(skill)
 
-    title_match = re.search(r"(?i)(ai|data analyst|software|machine learning|ml|swe)[\w\s/-]*intern", cleaned)
+    # Lazy, not greedy: [\w\s/-]* used to run past the first "Intern" and stop
+    # at the last one in the document, so "AI Intern\n\nWe are looking for an AI
+    # Intern to..." yielded that whole span as the job title.
+    title_match = re.search(r"(?i)(ai|data analyst|software|machine learning|ml|swe)[\w\s/-]*?intern", cleaned)
     analysis = JobDescriptionAnalysis(
         job_title=title_match.group(0).strip() if title_match else "Internship Role",
         company="unknown",

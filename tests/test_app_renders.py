@@ -58,6 +58,33 @@ def test_untouched_tabs_prompt_for_an_analysis_rather_than_erroring():
     assert any("Run the analysis first" in message for message in messages)
 
 
+def test_download_button_appears_once_a_result_exists():
+    """Seed a finished analysis and confirm the export control renders."""
+
+    from eval.run_eval import use_deterministic_agents
+
+    use_deterministic_agents()
+    from src.workflow.careerpilot_graph import run_workflow
+    from src.workflow.state import create_initial_state
+
+    resume = "Alex Chen\nSkills: Python, SQL, Flask\nProject: Task Manager using Flask."
+    jd = "Software Engineering Intern needs Python, Flask, SQL."
+
+    app = AppTest.from_file("app.py", default_timeout=60)
+    app.session_state["last_result"] = run_workflow(create_initial_state(resume, jd))
+    app.run()
+
+    # AppTest exposes no download_button accessor in this Streamlit version, so
+    # reach for the element by type. Rendering without an exception already
+    # shows st.download_button accepted the generated report.
+    assert not app.exception, [str(e) for e in app.exception]
+    labels = [element.label for element in app.get("download_button")]
+    assert "Download full report (Markdown)" in labels
+
+    metrics = {element.label: element.value for element in app.metric}
+    assert "Match Score" in metrics
+
+
 def test_sensitive_reminder_is_not_shown_before_any_analysis():
     """It used to render unconditionally, warning about content not on screen."""
 

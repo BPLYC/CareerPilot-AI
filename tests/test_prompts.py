@@ -59,3 +59,20 @@ def test_find_known_skills_returns_taxonomy_order(text, expected):
 
 def test_taxonomy_has_no_duplicates():
     assert len(KNOWN_SKILLS) == len(set(KNOWN_SKILLS))
+
+
+@pytest.mark.parametrize(
+    ("jd_text", "expected"),
+    [
+        ("AI Intern\n\nWe are looking for an AI Intern to build prototypes.", "AI Intern"),
+        ("Data Analyst Intern\n\nJoin our Data Analyst Intern programme.", "Data Analyst Intern"),
+        ("SWE Intern needed. The SWE Intern will ship features.", "SWE Intern"),
+        ("Barista wanted", "Internship Role"),
+    ],
+)
+def test_job_title_stops_at_the_first_match(jd_text, expected):
+    # The pattern was greedy, so it ran past the heading and returned everything
+    # up to the last "Intern" in the document as the job title.
+    from src.agents.jd_analyzer_agent import fallback_analyze_jd
+
+    assert fallback_analyze_jd(jd_text)["job_title"] == expected

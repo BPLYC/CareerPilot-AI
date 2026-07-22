@@ -2,6 +2,8 @@
 
 import streamlit as st
 
+from src.services.report_export import build_markdown_report, suggested_filename
+
 
 def render(state: dict | None) -> None:
     if not state or not state.get("match_report"):
@@ -9,6 +11,15 @@ def render(state: dict | None) -> None:
         return
 
     report = state["match_report"]
+
+    st.download_button(
+        "Download full report (Markdown)",
+        data=build_markdown_report(state),
+        file_name=suggested_filename(state),
+        mime="text/markdown",
+        use_container_width=True,
+        help="Match report, bullet suggestions, application answers, and interview questions.",
+    )
     col1, col2, col3 = st.columns(3)
     col1.metric("Match Score", f"{report['overall_score']}/100")
     col2.metric("Matched Skills", len(report["matched_skills"]))

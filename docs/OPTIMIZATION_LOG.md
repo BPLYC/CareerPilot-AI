@@ -700,3 +700,86 @@ $ (Get-Content app.py | Measure-Object -Line).Lines
 
 本 slice 无 API 调用，不产生费用。
 
+## Slice 8: 报告导出（新功能）
+
+### 改动
+
+新增 `src/services/report_export.py`，把完成的工作流状态渲染为 Markdown：匹配报告、
+bullet 建议、申请回答草稿、面试练习题、警告，并保留审阅提示与敏感问题声明。该模块
+不依赖 Streamlit，可直接测试。Match Report tab 增加一个下载按钮。
+
+### 我自己违反了预算规程
+
+预览导出效果时，我在 PowerShell 里把 `DEEPSEEK_API_KEY` 设为空字符串，以为这样
+就是离线运行，因此没有先跑预算闸。结果那次运行**调用了真实 API** —— 输出的分数 58
+与详尽的解释文本只可能来自真实模型。
+
+原因正是 slice 1 记录过的机制：`provider_config` 在 import 时调用 `load_dotenv()`，
+从上层目录找到 `.env` 并把变量填了回来。**我记录了这个陷阱，然后自己踩了进去。**
+从 shell 设置环境变量不起作用，唯一可靠的方式是在 import 之后清除，也就是
+`eval/run_eval.py` 里的 `use_deterministic_agents()`。
+
+后续预览已改用该函数。这次意外调用的费用在允许范围内，但流程是错的，记录在此。
+
+### 预览暴露的两个缺陷
+
+肉眼检查导出结果时发现两处问题，都不是断言能覆盖到的。
+
+**一、bullet 标题变成整段文字。** schema 中 `context` 字段意为项目或岗位名称，
+确定性路径也确实如此。但真实模型经常把整条改写后的 bullet 放进 `context`，于是
+Markdown 标题变成了一整段：
+
+```text
+### 1. Built a movie recommendation system using Python, pandas, NumPy, and
+scikit-learn. Compared collaborative filtering and content-based recommendations
+and visualized model results with Matplotlib.
+```
+
+导出侧对超过 60 字符的 `context` 做截断，而不是信任上游数据。
+
+**二、职位名提取的贪婪匹配 bug。** 导出的文件名是：
+
+```text
+careerpilot-ai-intern-we-are-looking-for-an-ai-intern-20260723.md
+```
+
+`jd_analyzer_agent.py` 的职位名正则用了贪婪量词：
+
+```text
+greedy -> 'AI Intern  We are looking for an AI Intern'
+lazy   -> 'AI Intern'
+```
+
+`[\w\s/-]*` 会越过第一个 "Intern"，一直匹配到文档中最后一个。这不只影响导出 ——
+职位名同时显示在 Match Report、Run History 表格中，还被用于拼装 RAG 检索 query。
+改为非贪婪量词并补充测试。
+
+修复后文件名为 `careerpilot-ai-intern-20260723.md`。
+
+值得一提的是，评估指标在此修复后**没有变化**。原本预期 RAG query 改变会影响检索
+结果，但知识库只有 8 个 chunk 且总是被全量返回，query 内容不起作用 —— 与 slice 1
+的发现一致。
+
+### 一条写错的测试
+
+新增的 AppTest 用例最初调用 `app.download_button`，报 `AttributeError`。该
+Streamlit 版本的 `AppTest` 没有这个访问器，需要用 `app.get("download_button")`。
+应用本身渲染无异常，是测试的写法有误。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+117 passed in 2.20s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL
+```
+
+测试数从 99 增至 117。除断言外，也实际生成并肉眼检查了完整报告 —— 上述两个缺陷
+都是这样发现的，不是靠测试发现的。
+
