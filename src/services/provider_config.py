@@ -1,6 +1,7 @@
 """Provider configuration for OpenAI-compatible LLM endpoints."""
 
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 try:
@@ -61,3 +62,34 @@ def get_provider_config(model_override: str = "") -> ProviderConfig:
         request_timeout=_int_env("DEEPSEEK_REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT),
         max_retries=_int_env("DEEPSEEK_MAX_RETRIES", DEFAULT_MAX_RETRIES),
     )
+
+
+@contextmanager
+def provider_overrides(model: str = "", thinking: str = "", reasoning_effort: str = ""):
+    """Apply caller-chosen provider settings for the duration of a block.
+
+    Agents read their configuration from the environment, so settings picked in
+    the UI have to reach them that way. Doing it while rendering a widget means
+    drawing the sidebar mutates process-wide state on every Streamlit rerun and
+    never restores it. Scoping the change to the analysis keeps the mechanism
+    but confines the blast radius, and empty values are ignored rather than
+    blanking whatever .env supplied.
+    """
+
+    overrides = {
+        "DEEPSEEK_MODEL": model,
+        "DEEPSEEK_THINKING": thinking,
+        "DEEPSEEK_REASONING_EFFORT": reasoning_effort,
+    }
+    applied = {key: value for key, value in overrides.items() if value}
+    previous = {key: os.environ.get(key) for key in applied}
+
+    os.environ.update(applied)
+    try:
+        yield
+    finally:
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old

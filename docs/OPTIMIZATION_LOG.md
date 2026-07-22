@@ -627,3 +627,76 @@ OUTPUTS IDENTICAL
 
 本 slice 无 API 调用，不产生费用。
 
+## Slice 7: 拆分 app.py 与清理副作用
+
+### 动机
+
+`app.py` 用 263 行容纳 6 个 tab 的全部渲染逻辑、缓存处理、工作流调用与运行历史。
+除此之外还有两处具体缺陷：
+
+1. **渲染 widget 会产生全局副作用。** 侧边栏在读取用户选择后直接写
+   `os.environ["DEEPSEEK_MODEL"]` 等（原 `app.py:75,80,90`）。Streamlit 每次交互
+   都会重跑整个脚本，因此每次交互都在修改进程级状态，且从不还原。模型输入框留空
+   时旧值也不会被清除。
+2. **签证/薪酬提示无条件渲染**（原 `app.py:216`）。它位于 tab 的最外层，在任何
+   分析运行之前就会显示 —— 警告一段当时并不在屏幕上的内容。
+
+### 改动
+
+拆分为 8 个模块：`src/ui/sidebar.py`、`src/ui/analysis.py`、
+`src/ui/sample_data.py`，以及 `src/ui/tabs/` 下的 6 个 tab 模块。`app.py` 缩减为
+44 行，只负责装配。
+
+副作用清理：侧边栏改为返回 `ProviderSettings` 值对象，由 `run_analysis()` 通过新增
+的 `provider_overrides()` 上下文管理器在工作流运行期间应用，结束后还原原值。空值
+被忽略，不会覆盖 `.env` 提供的配置。异常路径也会还原。
+
+签证提示改为仅在确有草稿内容时渲染。
+
+### 拆分过程中自己引入又修掉的一处回归
+
+初版 `app.py` 在渲染 tab 之前读取 `st.session_state["last_result"]`。原实现是在
+tab1 的代码块**之后**读取的 —— 顺序不同会导致分析跑完后当次看不到结果，必须再交互
+一次才刷新。已改回在 `input_tab.render()` 之后读取，并加注释说明原因。
+
+### 关于「HTTP 200」不足以验证 UI
+
+启动 Streamlit 后 `Invoke-WebRequest` 返回 `HTTP 200 OK`，stderr 也没有报错：
+
+```text
+2026-07-23 04:40:33.176 Uvicorn server started on 127.0.0.1:8511
+```
+
+但这**证明不了 UI 正常**。Streamlit 在客户端建立 websocket 会话之前不会执行
+`app.py`，HTTP 请求拿到的只是外壳 HTML。把一个文件拆成 8 个模块后，import 错误或
+属性错误恰恰只在渲染时才暴露 —— 而这正是该验证方式看不到的部分。
+
+项目此前的验证记录多次以「HTTP 200」作为 UI 可用的证据，这个判据是不充分的。
+
+改用 Streamlit 自带的 `AppTest` 无头执行整个脚本（`tests/test_app_renders.py`，
+5 条）：断言脚本未抛异常、6 个 tab 全部存在、侧边栏三个控件齐全、未运行分析时提示
+文案正确、以及签证提示在分析前不出现。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+99 passed in 2.70s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL
+
+$ (Get-Content app.py | Measure-Object -Line).Lines
+44
+```
+
+`app.py` 从 263 行降至 44 行。测试数从 82 增至 99，新增 12 条覆盖此前内联在渲染
+函数中、无法单独测试的逻辑（问题文本切分、样例数据加载、历史表格列映射、
+`provider_overrides` 的还原语义），以及 5 条 AppTest。
+
+本 slice 无 API 调用，不产生费用。
+
