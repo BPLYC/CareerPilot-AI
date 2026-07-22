@@ -6,7 +6,6 @@ from src.services.comparison_evaluation import (
     summarize_comparison,
 )
 
-
 RESUME = (
     "Alex Chen\nSkills: Python, SQL, Flask, Git, Docker, REST API\n"
     "Project: Personal Task Manager Web App using Flask and SQLite."

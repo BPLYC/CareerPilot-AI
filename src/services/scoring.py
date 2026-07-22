@@ -1,11 +1,11 @@
 """Deterministic scoring helpers used by agents and evaluation."""
 
-from typing import Iterable, List, Tuple
+from collections.abc import Iterable
 
 from src.utils.text_utils import contains_keyword, normalize_token, unique_preserve_order
 
 
-def matched_and_missing_skills(resume_skills: Iterable[str], required_skills: Iterable[str]) -> Tuple[List[str], List[str]]:
+def matched_and_missing_skills(resume_skills: Iterable[str], required_skills: Iterable[str]) -> tuple[list[str], list[str]]:
     resume_tokens = {normalize_token(skill) for skill in resume_skills}
     matched = []
     missing = []

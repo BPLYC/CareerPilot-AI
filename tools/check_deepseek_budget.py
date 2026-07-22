@@ -21,7 +21,6 @@ import sys
 import urllib.error
 import urllib.request
 
-
 # Floor agreed with the repository owner on 2026-07-23. Below this, the
 # unattended loop stops making real API calls and verifies offline instead.
 DEFAULT_FLOOR_CNY = 2.00
@@ -33,7 +32,7 @@ def load_env(path: str = ".env") -> dict:
     values = {}
     if not os.path.exists(path):
         return values
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:

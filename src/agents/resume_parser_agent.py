@@ -8,7 +8,6 @@ from src.services.prompts import RESUME_PARSER_SYSTEM, schema_instruction
 from src.services.structured_output import model_to_dict
 from src.utils.text_utils import clean_text, truncate_text, unique_preserve_order
 
-
 KNOWN_SKILLS = [
     "Python", "SQL", "scikit-learn", "pandas", "NumPy", "Git", "Flask", "Matplotlib",
     "PyTorch", "TensorFlow", "Docker", "Tableau", "Java", "C++", "NLP", "React",

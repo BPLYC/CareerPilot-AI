@@ -2,8 +2,6 @@
 
 import os
 from dataclasses import dataclass
-from typing import List
-
 
 KNOWLEDGE_BASE_DIR = os.path.join("data", "knowledge_base")
 
@@ -23,7 +21,7 @@ SOURCE_COLLECTIONS = {
 }
 
 
-def load_all_knowledge_docs(base_dir: str = KNOWLEDGE_BASE_DIR) -> List[KnowledgeChunk]:
+def load_all_knowledge_docs(base_dir: str = KNOWLEDGE_BASE_DIR) -> list[KnowledgeChunk]:
     chunks = []
     if not os.path.isdir(base_dir):
         return chunks
@@ -31,13 +29,13 @@ def load_all_knowledge_docs(base_dir: str = KNOWLEDGE_BASE_DIR) -> List[Knowledg
         path = os.path.join(base_dir, filename)
         if not os.path.exists(path):
             continue
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             content = handle.read()
         chunks.extend(split_markdown(content, filename, collection, doc_type))
     return chunks
 
 
-def split_markdown(content: str, source: str, collection: str, doc_type: str, chunk_size: int = 1200) -> List[KnowledgeChunk]:
+def split_markdown(content: str, source: str, collection: str, doc_type: str, chunk_size: int = 1200) -> list[KnowledgeChunk]:
     paragraphs = [part.strip() for part in content.split("\n\n") if part.strip()]
     chunks = []
     current = ""

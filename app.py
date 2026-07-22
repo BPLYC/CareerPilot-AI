@@ -11,7 +11,6 @@ from src.services.run_history import list_recent_runs, record_run
 from src.workflow.careerpilot_graph import stream_workflow
 from src.workflow.state import create_initial_state
 
-
 SAMPLE_JDS = {
     "AI Intern": "data/sample_jd_ai_intern.txt",
     "Data Analyst": "data/sample_jd_data_analyst.txt",
@@ -20,7 +19,7 @@ SAMPLE_JDS = {
 
 
 def read_text(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         return handle.read()
 
 

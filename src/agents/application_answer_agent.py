@@ -5,7 +5,6 @@ from src.models.schemas import ApplicationAnswerSet, ApplicationQuestionAnswer
 from src.services.prompts import APPLICATION_ANSWER_SYSTEM, schema_instruction
 from src.services.structured_output import model_to_dict
 
-
 SENSITIVE_NOTICE = (
     "Visa, work authorization, sponsorship, salary, and legal eligibility answers "
     "must be filled by the applicant directly."

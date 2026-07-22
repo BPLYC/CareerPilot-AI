@@ -1,6 +1,6 @@
 """Resume optimizer node."""
 
-from src.agents.common import can_use_llm, invoke_structured
+from src.agents.common import can_use_llm
 from src.models.schemas import BulletSuggestion
 from src.services.prompts import RESUME_OPTIMIZER_SYSTEM
 from src.services.structured_output import loads_json, model_to_dict, validate_dict

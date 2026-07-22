@@ -111,6 +111,7 @@ def run_workflow(initial_state: dict) -> dict:
 def build_graph():
     try:
         from langgraph.graph import END, StateGraph
+
         from src.workflow.state import CareerPilotState
     except ImportError:
         return None
