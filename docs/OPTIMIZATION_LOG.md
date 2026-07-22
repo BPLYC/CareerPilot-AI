@@ -556,3 +556,74 @@ parallel traces:
 LLM 往返，这与「两次串行调用变成两次并发调用」的预期一致。两次 `jd_analyzer`
 调用返回的技能数不同（4 vs 5），是 LLM 本身的非确定性，与并行化无关。
 
+## Slice 6: 补 parser 与 LLM 分支测试
+
+### 动机
+
+两处零覆盖，都在用户输入直接经过的路径上。
+
+**上传解析。** 核实过改动前的测试目录，没有任何测试引用 `parse_pdf`、
+`parse_docx`、`parse_resume_file` 或 `src.parsers`：
+
+```text
+$ for f in $(git ls-tree --name-only c35a358 tests/); do
+    git show c35a358:$f | grep -qE "parse_pdf|parse_docx|parse_resume_file|src.parsers" && echo "HIT: $f"
+  done
+(无输出)
+```
+
+`src/parsers/` 三个模块此前一行测试都没有，而简历是用户上传的文件，这条路径要
+面对各种真实产物：带 BOM 的导出、遗留编码、空文件、扩展名不符的文件。
+
+**LLM 分支。** `tests/conftest.py` 的 autouse fixture 清除 API key，因此整个测试
+套件跑的都是确定性 fallback，`can_use_llm()` 为真时的那条分支从未被执行过。这意味
+着 `invoke_structured()`、`invoke_structured_list()` 与结构化输出校验在测试中完全
+没有被覆盖。
+
+这个问题在 slice 2 已经露过一次头：当时新写的一条测试之所以失败，正是因为没有
+伪造凭据，`run_node()` 根本没进入 LLM 分支。
+
+### 改动
+
+`tests/test_parsers.py`（13 条）：用 PyMuPDF 和 python-docx 在内存中生成真实的
+PDF/DOCX 文件后往返解析，覆盖 None 输入、空文件、UTF-8 / UTF-8-BOM / Latin-1 编码、
+无法解码的字节、大写扩展名、不支持的扩展名，以及损坏的二进制文件。
+
+`tests/test_llm_branches.py`（14 条）：用一个假的 chat model 替换 `common.get_llm`
+并将 `can_use_llm()` 固定为真，覆盖 6 个节点各自的 LLM 分支。
+
+其中值得单独指出的几条：
+
+- 模型回答签证问题时，答案仍被 `SENSITIVE_NOTICE` 覆盖。这条测试保护的是安全
+  边界 —— 模型有可能自作主张回答签证资格问题，那个答案绝不能到达用户。
+- `{"items": [...]}` 包装能被正确拆开，而不是整体判定为解析失败。
+- 四种无法解析的响应（非 JSON、截断的 JSON、类型错误、空字符串）都落到 fallback
+  并记录错误。
+- 响应内容不是字符串而是结构化块时也能处理。
+
+这些测试都不是空转的：以 `test_resume_parser_uses_the_model_response` 为例，它
+断言结果中的姓名为「Parsed By Model」，该值只可能来自假模型；若 LLM 分支未被执行，
+拿到的会是 fallback 解析出的「Alex Chen」，测试立即失败。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+82 passed in 1.98s
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+OUTPUTS IDENTICAL
+```
+
+测试数从 55 增至 82。本 slice 只新增测试，未改动任何产品代码，评估输出因此不变。
+
+值得记录的是：13 条 parser 测试**一次就全部通过**，没有发现缺陷。解析模块比预期
+健壮 —— `parse_pdf` 已经处理空字节流，`_read_text_file` 已经有编码回退链，
+`parse_resume_file` 已经对扩展名做小写归一。此前缺的不是健壮性，是证据。
+
+本 slice 无 API 调用，不产生费用。
+
