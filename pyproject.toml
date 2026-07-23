@@ -36,3 +36,8 @@ ignore = [
 testpaths = ["tests"]
 # Keep offline determinism: no test may depend on a real DEEPSEEK_API_KEY.
 addopts = "-q"
+# Tests import `from src...`, which only resolves by accident under
+# `python -m pytest` because that puts the working directory on sys.path. Bare
+# `pytest`, which is what CI runs, does not, and every test module failed to
+# import. Setting it here makes both invocations behave the same.
+pythonpath = ["."]
