@@ -1,5 +1,6 @@
 """Evaluation metric helpers."""
 
+from src.rag.knowledge_loader import load_all_knowledge_docs
 from src.services.scoring import keyword_coverage, skill_match_rate, star_coverage_rate
 from src.utils.text_utils import contains_keyword
 
@@ -21,19 +22,23 @@ FIXED_APPLICATION_FIELDS = ("why_this_role", "key_strengths", "project_example")
 ROLE_SPECIFIC_FOCUS_AREAS = {"ml evaluation", "analytics validation", "software engineering"}
 
 
-def rag_corpus_fraction(retrieved_context: dict) -> float:
-    """How much of the knowledge base one query pulled back.
+def rag_corpus_headroom(retrieved_context: dict) -> float:
+    """What share of the knowledge base a single query pulled back.
 
-    A snippet count alone says nothing about retrieval: returning 8 of 8
-    available chunks and returning 8 of 800 are the same number and completely
-    different behaviours. This divides what was retrieved by what existed, so
-    1.0 means retrieval had no choice and lower values mean it selected.
+    This is a corpus-size guard, not a measure of retrieval quality. Because
+    fallback_retrieve always fills its k, the value is pinned at
+    requested / corpus_size whenever the corpus exceeds the request: 0.36 today,
+    and constant across cases. It moves only when a collection runs short, which
+    is the failure it exists to catch -- retrieval that returns everything it
+    has is not selecting at all, which is what 1.0 means.
+
+    It deliberately does not claim to say whether the ranking is any good. That
+    needs comparing the contexts retrieved for different roles; see
+    summarize_comparison's rag_context_overlap.
     """
 
     if not retrieved_context:
         return 0.0
-
-    from src.rag.knowledge_loader import load_all_knowledge_docs
 
     corpus_size = len(load_all_knowledge_docs())
     if not corpus_size:
@@ -41,6 +46,32 @@ def rag_corpus_fraction(retrieved_context: dict) -> float:
 
     retrieved = sum(len(items) for items in retrieved_context.values())
     return round(min(retrieved / corpus_size, 1.0), 4)
+
+
+def rag_context_overlap(contexts: list[dict]) -> float:
+    """Mean pairwise Jaccard overlap of the snippets retrieved for each case.
+
+    This is the metric that actually tracks ranking quality, and the one
+    rag_corpus_headroom cannot be. 1.0 means every role received the same
+    snippets, which is what the knowledge base produced before it was chunked
+    per section; lower means retrieval discriminated between them. It degrades
+    if ranking degrades, so it is worth watching rather than merely recording.
+    """
+
+    snippet_sets = [
+        {snippet for items in context.values() for snippet in items}
+        for context in contexts
+        if context
+    ]
+    if len(snippet_sets) < 2:
+        return 0.0
+
+    scores = []
+    for index, first in enumerate(snippet_sets):
+        for second in snippet_sets[index + 1:]:
+            union = first | second
+            scores.append(len(first & second) / len(union) if union else 0.0)
+    return round(sum(scores) / len(scores), 4) if scores else 0.0
 
 
 def _is_sensitive_question(question: str) -> bool:
@@ -149,7 +180,7 @@ def evaluate_state(state: dict) -> dict:
             1 for item in interview_questions if (item.get("focus_area") or "").lower() == "required skill evidence"
         ),
         "rag_snippet_count": sum(len(items) for items in retrieved_context.values()),
-        "rag_corpus_fraction": rag_corpus_fraction(retrieved_context),
+        "rag_corpus_headroom": rag_corpus_headroom(retrieved_context),
         "workflow_trace_count": len(workflow_trace),
         "reflection_review_count": sum(1 for item in workflow_trace if "ReflectionNode" in item),
         "phase_two_parallel_count": sum(1 for item in workflow_trace if "PhaseTwoParallelNode" in item),

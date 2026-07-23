@@ -36,9 +36,9 @@ const compareOut = resolve(repo, "docs/assets/careerpilot-compare-jobs.png");
 const chromeProfile = resolve(tmpdir(), "careerpilot-chrome-profile");
 
 // Screenshots are committed artifacts, so they default to the deterministic
-// path: regenerating them produces the same images, costs nothing, and cannot
-// freeze a one-off bad model response into the README. The live score for the
-// sample data has been observed anywhere between 3 and 65 on identical input.
+// path: regenerating them produces the same images and costs nothing. The model
+// also scores 15-20 points below the deterministic scorer, so a live capture is
+// both irreproducible and less representative.
 // Pass --live to capture real model output instead.
 const live = process.argv.includes("--live");
 

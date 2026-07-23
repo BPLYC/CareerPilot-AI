@@ -18,8 +18,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from src.agents.jd_analyzer_agent import fallback_analyze_jd
 from src.rag.build_vectorstore import DISABLE_VECTORSTORE_ENV
+from src.rag.retriever import retrieve_context
 from src.services.comparison_evaluation import evaluate_methods, summarize_comparison
+from src.services.evaluation import rag_context_overlap
 
 # Cleared for deterministic runs. Emptying the key is what flips
 # ProviderConfig.is_configured, and therefore can_use_llm(), to False.
@@ -64,6 +67,12 @@ def main() -> None:
     for case in cases:
         for metrics in evaluate_methods(read_text(case["resume_path"]), read_text(case["jd_path"])):
             rows.append({"case": case["case"], **metrics})
+
+    # Cross-case, so it cannot live in the per-case metrics: how much the
+    # retrieved context is shared between roles. Unlike the per-row RAG numbers
+    # this one moves when ranking changes.
+    overlap = rag_context_overlap([retrieve_context(fallback_analyze_jd(read_text(c["jd_path"]))) for c in cases])
+    print(f"RAG context overlap across the {len(cases)} cases: {overlap} (1.0 = every role got the same snippets)")
 
     output_path = os.path.join(ROOT, "outputs", "evaluation_results.csv")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

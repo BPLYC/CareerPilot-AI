@@ -10,6 +10,7 @@ Software Engineering bullets shared one chunk and no query could separate them.
 import pytest
 
 from src.agents.jd_analyzer_agent import fallback_analyze_jd
+from src.rag import build_vectorstore
 from src.rag.build_vectorstore import (
     DISABLE_VECTORSTORE_ENV,
     FORCE_VECTORSTORE_ENV,
@@ -18,7 +19,7 @@ from src.rag.build_vectorstore import (
 )
 from src.rag.knowledge_loader import load_all_knowledge_docs, split_markdown
 from src.rag.retriever import retrieve_context, retrieve_snippets
-from src.services.evaluation import rag_corpus_fraction
+from src.services.evaluation import rag_context_overlap, rag_corpus_headroom
 from src.services.llm_client import LocalHashEmbeddings
 from src.ui.sample_data import SAMPLE_JDS, read_text
 
@@ -82,6 +83,25 @@ def test_a_long_section_splits_but_keeps_its_heading():
     for chunk in chunks:
         assert chunk.content.startswith("# Long Section")
         assert chunk.metadata["category"] == "long_section"
+        # A heading-only chunk still scores on its heading, so it would win a
+        # retrieval slot and hand the prompt an empty snippet.
+        assert chunk.content.strip() != "# Long Section"
+
+
+def test_a_first_paragraph_over_the_limit_does_not_emit_a_bare_heading():
+    chunks = split_markdown("# H\n\n" + "x" * 300, "f.md", "c", "t", chunk_size=200)
+
+    assert [c.content.strip() for c in chunks] == [f"# H\n\n{'x' * 300}"]
+
+
+def test_a_heading_without_a_blank_line_yields_a_usable_category():
+    # Ordinary markdown, and the paragraph splitter cannot separate the two, so
+    # the heading arrives with its body attached. Whitespace has to collapse or
+    # the category ends up containing newlines.
+    category = split_markdown("# Alpha\nbody text here", "f.md", "c", "t")[0].metadata["category"]
+
+    assert "\n" not in category
+    assert category.startswith("alpha")
 
 
 def test_content_without_a_heading_still_produces_a_chunk():
@@ -135,7 +155,34 @@ def test_retrieval_reflects_the_role():
 def test_retrieval_does_not_return_the_whole_corpus():
     context = _context_for(SAMPLE_JDS["AI Intern"])
 
-    assert rag_corpus_fraction(context) < 0.5
+    # Compare against what the retriever asked for rather than a round number:
+    # `< 0.5` cannot fail while the corpus stays above 32 chunks, so it would
+    # keep passing long after the corpus stopped being big enough to choose from.
+    corpus_size = len(load_all_knowledge_docs())
+    requested = sum(REQUESTED.values())
+    assert rag_corpus_headroom(context) == pytest.approx(requested / corpus_size, abs=0.001)
+    assert corpus_size > requested * 2, "corpus should comfortably exceed one query's worth"
+
+
+def test_context_overlap_falls_when_roles_get_different_snippets():
+    contexts = [_context_for(path) for path in SAMPLE_JDS.values()]
+
+    overlap = rag_context_overlap(contexts)
+
+    # 1.0 is what the old chunking produced: every role received identical
+    # snippets. This is the number that moves if ranking degrades.
+    assert 0.0 < overlap < 0.85
+
+
+def test_context_overlap_is_one_when_every_role_gets_the_same_snippets():
+    same = {"c": ["a", "b"]}
+
+    assert rag_context_overlap([same, same, same]) == 1.0
+
+
+def test_context_overlap_needs_at_least_two_contexts():
+    assert rag_context_overlap([{"c": ["a"]}]) == 0.0
+    assert rag_context_overlap([]) == 0.0
 
 
 def test_snippets_are_capped_at_k():
@@ -148,19 +195,28 @@ def test_heading_matches_outrank_incidental_body_mentions():
     assert top.splitlines()[0] == "# Deep Learning"
 
 
+def test_a_stopword_in_a_heading_does_not_win_a_slot():
+    # "Backend And API" and "Testing And Quality" both contain "and", which
+    # `len(term) > 2` keeps. Scoring it at heading weight let joining words
+    # outrank a genuinely relevant section.
+    top = retrieve_snippets("python and machine learning", "resume_bullets", k=1)[0]
+
+    assert "And" not in top.splitlines()[0], f"a stopword picked the winner: {top.splitlines()[0]}"
+
+
 # --- the metric -----------------------------------------------------------
 
 
-def test_corpus_fraction_is_one_when_retrieval_had_no_choice():
+def test_headroom_is_one_when_retrieval_had_no_choice():
     corpus_size = len(load_all_knowledge_docs())
     everything = {"c": ["snippet"] * corpus_size}
 
-    assert rag_corpus_fraction(everything) == 1.0
+    assert rag_corpus_headroom(everything) == 1.0
 
 
-def test_corpus_fraction_is_clamped_and_handles_empty_input():
-    assert rag_corpus_fraction({}) == 0.0
-    assert rag_corpus_fraction({"c": ["s"] * 10_000}) == 1.0
+def test_headroom_is_clamped_and_handles_empty_input():
+    assert rag_corpus_headroom({}) == 0.0
+    assert rag_corpus_headroom({"c": ["s"] * 10_000}) == 1.0
 
 
 # --- vectorstore gating ---------------------------------------------------
@@ -200,9 +256,46 @@ def test_vectorstore_can_still_be_forced(monkeypatch):
     monkeypatch.delenv(DISABLE_VECTORSTORE_ENV, raising=False)
     monkeypatch.setenv(FORCE_VECTORSTORE_ENV, "1")
 
-    # Either a store or None if chromadb is absent; the point is that the
-    # embedding gate no longer short-circuits it.
+    # Assert the gate was actually bypassed rather than just that nothing threw:
+    # without this the test passes even if FORCE_VECTORSTORE_ENV is never read.
+    reached = []
+    monkeypatch.setattr(
+        build_vectorstore,
+        "load_all_knowledge_docs",
+        lambda *args, **kwargs: reached.append(True) or [],
+    )
+    monkeypatch.setattr(build_vectorstore, "VECTORSTORE_PATH", str(tmp_missing_path()))
+
     get_or_build_vectorstore()
+
+    assert reached, "the embedding gate short-circuited despite the force flag"
+
+
+def tmp_missing_path():
+    from pathlib import Path
+
+    return Path("data") / "vectorstore-does-not-exist"
+
+
+def test_semantic_embeddings_are_recognised(monkeypatch):
+    monkeypatch.setattr(build_vectorstore, "get_embeddings", lambda: object())
+
+    assert has_semantic_embeddings() is True
+
+
+def test_a_broken_embedding_provider_falls_back_instead_of_raising(monkeypatch):
+    # EMBEDDING_PROVIDER=openai with no OpenAI key raises inside get_embeddings.
+    # rag_retriever_node has no try/except, so propagating would abort the run.
+    def explode():
+        raise RuntimeError("Missing credentials")
+
+    monkeypatch.setattr(build_vectorstore, "get_embeddings", explode)
+    monkeypatch.delenv(DISABLE_VECTORSTORE_ENV, raising=False)
+    monkeypatch.delenv(FORCE_VECTORSTORE_ENV, raising=False)
+
+    assert has_semantic_embeddings() is False
+    assert get_or_build_vectorstore() is None
+    assert retrieve_snippets("python", "resume_bullets", k=1)
 
 
 def test_disable_beats_force(monkeypatch):

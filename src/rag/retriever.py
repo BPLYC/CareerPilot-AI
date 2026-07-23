@@ -5,6 +5,11 @@ from src.rag.knowledge_loader import load_all_knowledge_docs
 
 HEADING_WEIGHT = 3
 
+# Words that join a heading rather than describe it. "Backend And API" and
+# "Testing And Quality" would otherwise both score on "and" alone, and outrank
+# a genuinely relevant heading on a term that means nothing.
+HEADING_STOPWORDS = {"and", "the", "for", "with", "from", "into"}
+
 
 def _query_terms(query: str) -> set[str]:
     return {term.lower().strip(",.") for term in query.split() if len(term) > 2}
@@ -18,14 +23,18 @@ def _score(query: str, content: str, category: str = "") -> int:
     API" section and a "Deep Learning" section both mention Python; only the
     heading separates them.
 
-    Category matches count HEADING_WEIGHT times to reflect that.
+    A heading term is also present in the body, so a heading hit scores
+    1 + HEADING_WEIGHT in total.
     """
 
     terms = _query_terms(query)
     content_lower = content.lower()
     body_score = sum(1 for term in terms if term in content_lower)
 
-    category_words = (category or "").replace("_", " ")
+    # Whole-word match against the heading, not a substring test: "api" should
+    # not score against "rapid", and a multi-word query term should not match a
+    # heading merely because it shares a fragment.
+    category_words = set((category or "").replace("_", " ").split()) - HEADING_STOPWORDS
     heading_score = sum(1 for term in terms if term in category_words)
     return body_score + HEADING_WEIGHT * heading_score
 

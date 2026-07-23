@@ -135,7 +135,7 @@ These are captured on the deterministic path, so anyone can regenerate the ident
 node tools\capture_streamlit_screenshot.mjs
 ```
 
-Add `--live` to capture real model output instead. Note that the live match score is not stable: the sample resume and AI Intern JD have scored anywhere from 3 to 65 across runs, so a live capture freezes one draw from that spread.
+Add `--live` to capture real model output instead. A live capture freezes one model run, and the model scores 15-20 points below the deterministic scorer (see Limitations), so the deterministic default is the more representative picture as well as the reproducible one.
 
 ## Tests And Linting
 
@@ -178,7 +178,7 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Future Work
 
-- Refresh the README screenshots, which predate the Compare Jobs tab and the report export button.
+- Decide how to handle the systematic gap between the LLM score and the deterministic score: calibrate the prompt, sanity-check one against the other, or show both.
 - Optional demo GIF.
 - Synonym-aware retrieval needs a real embedding model. DeepSeek exposes no embeddings endpoint, so this requires either an OpenAI key (`EMBEDDING_PROVIDER=openai`, which enables the Chroma path automatically) or a local sentence-transformer.
 

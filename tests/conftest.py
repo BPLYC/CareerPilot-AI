@@ -13,3 +13,7 @@ def disable_deepseek_for_tests(monkeypatch):
         "DEEPSEEK_REASONING_EFFORT",
     ]:
         monkeypatch.delenv(key, raising=False)
+    # Pinned, not cleared: a maintainer who configures the documented
+    # EMBEDDING_PROVIDER=openai would otherwise see retrieval tests fail on
+    # their machine and pass in CI.
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "local_hash")

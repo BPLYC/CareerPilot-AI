@@ -36,7 +36,13 @@ def has_semantic_embeddings() -> bool:
     identical skill snippets for the analyst and engineer roles.
     """
 
-    return not isinstance(get_embeddings(), LocalHashEmbeddings)
+    try:
+        return not isinstance(get_embeddings(), LocalHashEmbeddings)
+    except Exception:
+        # EMBEDDING_PROVIDER=openai with no OpenAI key raises here. Retrieval is
+        # an optional enhancement, so fall back to the markdown path rather than
+        # aborting the whole analysis on a provider misconfiguration.
+        return False
 
 
 def get_or_build_vectorstore():

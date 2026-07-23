@@ -313,8 +313,9 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Regenerate the README screenshots; they predate the Compare Jobs tab and the
-   report export button.
+1. Decide how to handle the systematic gap between the LLM score and the
+   deterministic score: calibrate the prompt, sanity-check one against the
+   other, or show both. See the Limitations section of the README.
 2. Optionally add a short demo GIF if the README needs a walkthrough.
 3. Synonym-aware retrieval, if it is ever wanted, needs a real embedding model.
    Do not reach for the Chroma path expecting this: with the default

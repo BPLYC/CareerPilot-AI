@@ -939,17 +939,8 @@ Data Quality Issue。改动前三者拿到的是**完全相同**的内容。
 这个计数从此恒为 16，依旧不衡量任何东西。「返回 8 条中的 8 条」和「返回 800 条中的
 8 条」是同一个数字，却是完全不同的行为。
 
-因此新增 `rag_corpus_fraction` —— 检索结果占语料总量的比例。1.0 意味着检索没有
-选择余地，越低说明选择性越强。
-
-```text
-method                 rag_snippet_count   rag_corpus_fraction
-Baseline                             0.0                   0.0
-LLM-only                             0.0                   0.0
-CareerPilot Full                    16.0                0.3636
-```
-
-改动前这一列会是 1.0。
+因此新增了一个占比指标。**但这个替代指标当时也没有真正解决问题** —— 见 slice 14 的
+更正：它同样是常量，只是换了个数值。
 
 ### 验证
 
@@ -1253,3 +1244,123 @@ $ pytest --basetemp=.pytest_tmp
 系统性偏低这一现象记入 README 已知限制与实施计划的技术债，供仓库所有者判断是否
 需要处理。本条不改变打分逻辑本身。
 
+
+## Slice 14: 代码评审后的修正
+
+仓库所有者要求不再自行 review，改由我调用评审流程后直接整合。使用
+`superpowers:requesting-code-review` 对 slice 10-13 的全部改动做了一次独立评审
+（base `2b790e7`，head `70fea64`）。评审未发现 Critical 问题，但指出 7 项 Important，
+其中数项是对我推理本身的纠正。以下是实际修复内容。
+
+### 一、只有标题没有内容的 chunk（真实潜伏缺陷）
+
+`split_markdown()` 的 flush 判断用的是 `current.strip()`，而 `current` 一开始就被
+塞进了标题，因此恒为真。当某一节的第一个段落本身就超过 `chunk_size` 时，第一轮循环
+就会产出一个**只含标题、没有任何正文**的 chunk：
+
+```python
+>>> split_markdown("# H\n\n" + "x"*300, "f", "c", "t", chunk_size=200)
+[KnowledgeChunk(content='# H', ...), KnowledgeChunk(content='# H\n\nxxx…', ...)]
+```
+
+评审用 2000 组随机数据验证，其中 997 组触发。当前知识库未触发，仅因最长段落 478
+字符远小于 1200。危害不只是浪费一个槽位：空 chunk 仍会因标题匹配获得高分，从而挤占
+检索结果并把空内容送进 prompt。
+
+改为显式追踪 `has_body`。同时补测试 —— 原有的
+`test_a_long_section_splits_but_keeps_its_heading` 用 `startswith("# Long Section")`
+断言，对只含标题的 chunk 同样成立，**捕捉不到这个缺陷**。
+
+### 二、`has_semantic_embeddings()` 可能抛异常中断整个分析
+
+配置 `EMBEDDING_PROVIDER=openai` 但没有 OpenAI key 时，`get_embeddings()` 会抛异常。
+`rag_retriever_node` 没有 try/except，也不经过 `run_node`，异常会一路冒泡终止工作流。
+而 README 与 AGENTS.md 恰恰把 `EMBEDDING_PROVIDER=openai` 作为启用向量库的推荐方式
+写在文档里。这违反了项目「可选依赖缺失时应降级而非崩溃」的原则。已加保护并补测试。
+
+### 三、我的新指标同样是常量（对推理的纠正）
+
+评审指出：`rag_corpus_fraction` 恒为 `16/44 = 0.3636`，每一行、每一次运行都一样。
+因为 `fallback_retrieve` 总是取满 k，而语料已超过请求量，这个值由构造决定。
+
+**这正是我在 slice 10 批评 `rag_snippet_count` 时用的同一个论证** —— 我用一个新的
+常量替换了旧的常量，还宣称已经解决。评审的判断是对的。
+
+修复分两部分：
+
+- 重命名为 `rag_corpus_headroom`，docstring 明确它是**语料规模的守卫**而非质量度量：
+  1.0 表示检索没有选择余地，这是它唯一能捕捉的失效。
+- 新增 `rag_context_overlap()` —— 不同岗位检索结果之间的平均 Jaccard 重合度。这是
+  真正会随排序质量变化的指标：旧分块下为 1.0（三个岗位拿到完全相同的内容），当前为
+  **0.3737**。它是跨案例的，因此由 `eval/run_eval.py` 输出而非放进逐案例的指标行。
+
+```text
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+RAG context overlap across the 3 cases: 0.3737 (1.0 = every role got the same snippets)
+```
+
+### 四、停用词拿到了标题权重
+
+`_query_terms` 以 `len(term) > 2` 过滤，保留了 "and"；而 category 匹配是子串判断，
+因此任何含 "And" 的标题都会仅凭 "and" 拿到 4 分：
+
+```text
+query "python and sql analysis" ->
+  data_analysis 7 | backend_and_api 4 | testing_and_quality 4 | machine_learning 2
+```
+
+「Backend And API」与「Testing And Quality」压过了「Machine Learning」。当前三个样例
+JD 的技能都是单词，尚未触发，但 LLM 分析器经常返回多词技能。改为对标题分词后做整词
+匹配，并剔除连接词。
+
+### 五、四条无效或过弱的测试
+
+- `test_vectorstore_can_still_be_forced` **没有任何断言** —— 即使强制开关从未被读取
+  也会通过。改为断言确实绕过了嵌入门控。
+- `test_retrieval_does_not_return_the_whole_corpus` 断言 `< 0.5`，但该值上限就是
+  0.36，**永远不可能失败**。改为与请求量对比。
+- `has_semantic_embeddings()` 的 True 分支此前无测试覆盖。
+- `tests/conftest.py` 未固定 `EMBEDDING_PROVIDER`。按文档配置了
+  `EMBEDDING_PROVIDER=openai` 的维护者，本地会看到检索测试失败而 CI 通过。已固定。
+
+### 六、我自己已推翻却仍留在文档里的说法
+
+评审指出「3 到 65」这个已被 slice 13 推翻的数字，仍然留在 `README.md` 的截图说明和
+`capture_streamlit_screenshot.mjs` 的注释里 —— README 甚至在 33 行之后就写着更正后的
+版本，自相矛盾。另有两处「截图待更新」的待办，而 slice 12 已经做完，README 在该条目
+上方 45 行处就嵌入了新截图。四处全部清理。
+
+评审的评语值得记下：slice 13 本身就是关于「纠正一个夸大的结论」，把那个结论留在
+README 里会削弱这条分支最有价值的部分。
+
+### 其他采纳的小项
+
+- `load_all_knowledge_docs()` 加 `lru_cache`：此前 `retrieve_context()` 每次会把 5 个
+  文件完整读取并解析 5 遍。
+- `_category_of()` 折叠空白：标题后若无空行，正文会被并入标题，导致 category 含换行。
+- `evaluation.py` 的函数内 import 改为顶层 —— 评审核实过不存在循环依赖，函数内 import
+  只是把 `services -> rag` 这条依赖边对工具隐藏了，边本身依然存在。
+- 补充 docstring：标题命中实际是 `1 + HEADING_WEIGHT = 4` 倍，而非 3 倍。
+- `split_markdown()` 中一个恒为真的死条件已移除。
+
+### 未采纳的项
+
+评审建议截图工具改为向上逐级查找 `.venv` 而非硬编码 worktree 深度，以及把 Compare
+流程里的固定 `sleep(3000)` 换成 `waitForText`。两项都合理，但属于工具健壮性而非产品
+代码，当前可用，记在此处备查。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+174 passed in 3.63s
+
+$ python eval/run_eval.py   （连续两次）
+输出逐字节一致
+```
+
+测试数从 166 增至 174。本条无 API 调用，不产生费用。

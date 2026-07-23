@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 KNOWLEDGE_BASE_DIR = os.path.join("data", "knowledge_base")
 
@@ -21,7 +22,15 @@ SOURCE_COLLECTIONS = {
 }
 
 
+@lru_cache(maxsize=4)
 def load_all_knowledge_docs(base_dir: str = KNOWLEDGE_BASE_DIR) -> list[KnowledgeChunk]:
+    """Read and chunk the knowledge base.
+
+    Cached because retrieve_context() asks for five collections and each call
+    re-read and re-parsed every file. The knowledge base is static at runtime;
+    tests that edit it should call load_all_knowledge_docs.cache_clear().
+    """
+
     chunks = []
     if not os.path.isdir(base_dir):
         return chunks
@@ -36,7 +45,11 @@ def load_all_knowledge_docs(base_dir: str = KNOWLEDGE_BASE_DIR) -> list[Knowledg
 
 
 def _category_of(heading: str) -> str:
-    return heading.strip("# ").strip().lower().replace(" ", "_") or "general"
+    # Collapse whitespace first: a heading written without a blank line after it
+    # arrives here with its body attached, and would otherwise become a category
+    # containing newlines.
+    collapsed = " ".join(heading.strip("# ").split())
+    return collapsed.lower().replace(" ", "_") or "general"
 
 
 def split_markdown(content: str, source: str, collection: str, doc_type: str, chunk_size: int = 1200) -> list[KnowledgeChunk]:
@@ -54,6 +67,10 @@ def split_markdown(content: str, source: str, collection: str, doc_type: str, ch
 
     Sections longer than chunk_size are still split, on paragraph boundaries,
     with the heading repeated so every part stays self-describing.
+
+    Any `#` level starts a new section, so a `## Child` chunk does not record
+    its `# Parent`. The knowledge files are flat today; if they gain subsections
+    that only make sense under their parent, carry the ancestor into the chunk.
     """
 
     sections: list[tuple[str, list[str]]] = []
@@ -74,15 +91,21 @@ def split_markdown(content: str, source: str, collection: str, doc_type: str, ch
         category = _category_of(section_heading) if section_heading else "general"
         metadata = {"source": source, "collection": collection, "type": doc_type, "category": category}
 
-        current = section_heading + "\n\n" if section_heading else ""
-        emitted = False
+        prefix = section_heading + "\n\n" if section_heading else ""
+        current = prefix
+        # Track the body separately: `current` is seeded with the heading and so
+        # is always truthy, and flushing on that alone emits a chunk holding
+        # nothing but the heading whenever the first paragraph already exceeds
+        # chunk_size. Such a chunk still scores on its heading, so it would win
+        # a retrieval slot and hand the prompt an empty snippet.
+        has_body = False
         for paragraph in paragraphs:
-            if current.strip() and len(current) + len(paragraph) > chunk_size:
+            if has_body and len(current) + len(paragraph) > chunk_size:
                 chunks.append(KnowledgeChunk(current.strip(), dict(metadata)))
-                emitted = True
-                # Repeat the heading so a continuation chunk still says what it is.
-                current = section_heading + "\n\n" if section_heading else ""
+                current = prefix
+                has_body = False
             current += paragraph + "\n\n"
-        if current.strip() and (paragraphs or not emitted):
+            has_body = True
+        if current.strip():
             chunks.append(KnowledgeChunk(current.strip(), dict(metadata)))
     return chunks
