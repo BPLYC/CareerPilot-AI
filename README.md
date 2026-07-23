@@ -171,7 +171,7 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Limitations
 
-- The LLM-produced match score is not stable. The bundled sample resume and AI Intern JD have scored 65, 62, 40, and 3 across separate runs with identical input, while the deterministic scorer returns 68 every time. Treat the score as a rough signal, and read the matched and missing skills, which vary far less.
+- The LLM scores lower than the deterministic scorer, consistently. Measured over four runs per role on the bundled samples: AI Intern 40-55 against 68, Data Analyst 60-65 against 79, SWE Intern 50 every time against 72. Run-to-run variation is small (0-15 points); the gap between the two scorers is the systematic part. Read the score as a rough signal and rely on the matched and missing skills, which are stable.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.

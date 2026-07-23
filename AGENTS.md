@@ -38,9 +38,11 @@ Read these files first:
   Jobs sample loader for an entire slice, and unit tests over the underlying
   function did not notice. Drive the UI with `AppTest` when a button is meant
   to change what a widget shows.
-- **The LLM match score swings widely on identical input** (observed 3 to 65 for
-  the sample data, against a stable 68 from the deterministic scorer). Do not
-  read a single run as a regression, and do not freeze one into a screenshot.
+- **The LLM scores 15-20 points below the deterministic scorer**, consistently
+  across the sample roles (AI Intern 40-55 vs 68, Data Analyst 60-65 vs 79, SWE
+  50 vs 72). Run-to-run variation is only 0-15 points, so a single differing run
+  is usually the offset rather than a regression. Do not freeze a live score
+  into a screenshot; the capture tool defaults to the deterministic path.
 - **The Chroma vectorstore is not the better retrieval path by default.**
   `LocalHashEmbeddings` buckets tokens by md5 into 64 dimensions: synonym
   similarity is 0.000 and 839 tokens collide into those buckets 13-deep. Ranking

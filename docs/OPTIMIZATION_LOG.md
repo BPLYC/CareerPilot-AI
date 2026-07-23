@@ -1140,21 +1140,8 @@ jd_blocks = st.text_area("Job descriptions", value=st.session_state.get("compare
 模型自己的解释写的是「strong alignment with Python, SQL, scikit-learn」。排查确认
 不是解析缺陷 —— 原始响应中的 `overall_score` 字段就是那个值，validated 之后一致。
 
-同一份简历与 JD，多次运行的 LLM 打分：
-
-| 运行 | LLM 打分 | 确定性打分 |
-| --- | --- | --- |
-| slice 3 验证 | 65 | 68 |
-| slice 4 验证 | 62 | 68 |
-| 截图首次 | 3 | 68 |
-| 诊断复现 | 40 | 68 |
-
-**用户在界面上看到的头号数字，在相同输入下从 3 摆动到 65。** 确定性算法稳定在 68。
-把其中任意一次冻结进 README 都是运气问题，因此截图使用确定性路径。
-
-这项分数不稳定本身是产品级问题，不在本条改动范围内 —— 记入 README 的已知限制，
-供仓库所有者判断是否需要处理（例如用确定性分数做合理性校验，或在两者差距过大时
-给出提示）。
+当时记录为「相同输入下从 3 摆动到 65」。**这个结论后来被证明是错的**，更正见
+下一条。截图使用确定性路径的决定本身仍然成立。
 
 ### 验证
 
@@ -1182,4 +1169,87 @@ Compare Jobs 显示排序表格与「Best fit: Data Analyst (79/100)」。新增
 
 本条产生少量 API 消耗：截图首次运行走的是真实路径，另有一次用于诊断 3/100 的调用。
 余额从 5.63 元降至 5.62 元附近（结算有延迟）。
+
+## Slice 13: 更正打分结论，并修复量纲导致的静默失败
+
+仓库所有者质疑了 slice 12 的结论：3 分是不是因为样例数据本身不合适？这促成了一次
+正式测量，结果推翻了我此前的说法。
+
+### 此前的结论错在哪里
+
+slice 12 写的是「相同输入下从 3 摆动到 65」。这个说法有两个问题：
+
+1. **输入并不相同。** 65 和 62 是 slice 10 修改 RAG 之前测得的，3 和 40 是之后。
+   检索到的片段是打分节点的输入之一（`retrieved_context` 会进入 prompt），因此
+   这四个数字并非来自同一条件。我把一个可能的因果关系当成了随机性。
+2. **样本量为 1 的离群值被当成了范围端点。** 3 分只出现过一次。
+
+### 正式测量
+
+每个样例 JD 连续 4 次，代码状态一致：
+
+```text
+=== ai_intern ===
+deterministic score: 68
+LLM, with RAG context              [40, 50, 50, 55]  mean=48.8  spread=15
+LLM, no RAG context                [40, 40, 50, 40]  mean=42.5  spread=10
+
+=== data_analyst ===
+deterministic score: 79
+LLM, with RAG context              [65, 60, 60, 65]  mean=62.5  spread=5
+
+=== swe_intern ===
+deterministic score: 72
+LLM, with RAG context              [50, 50, 50, 50]  mean=50.0  spread=0
+```
+
+更正后的结论：
+
+- **运行间波动很小**，0 到 15 分，SWE 岗四次完全相同。远不是「3 到 65」。
+- **真正的现象是系统性偏低**：LLM 一致地比确定性算法低 15 到 20 分，三个岗位皆然。
+  这是稳定偏差，不是噪声。
+- RAG 上下文使分数略微升高（48.8 对 42.5），方向合理。
+- 3 分是罕见离群值，在其后 12 次采样中未再出现。
+
+关于「是不是样例不合适」：**不是**。这份简历确实缺少 AI Intern JD 要求的
+PyTorch / TensorFlow / NLP，因此中等分数是正确结果，而非缺陷。README 截图已使用
+确定性路径，显示 68，本就是合理数字，无需更换样例。
+
+### 测量过程中发现的真实缺陷
+
+不带 RAG 上下文的那一组最初直接崩溃：
+
+```text
+pydantic_core._pydantic_core.ValidationError: 1 validation error for MatchReport
+overall_score
+  Input should be a valid integer, got a number with a fractional part
+  [type=int_from_float, input_value=0.4, input_type=float]
+```
+
+模型返回了 `"overall_score": 0.4` —— 用 0-1 而非 0-100 的量纲。Pydantic 拒绝该值，
+`run_node()` 捕获异常后改用确定性 fallback。也就是说：**模型给出了答案，系统把它
+丢掉了**，用户看到的是 fallback 结果，界面上只留下一条错误记录。
+
+这正是项目文档声称已处理的 schema drift，但 `structured_output.py` 未覆盖量纲这一类。
+
+新增 `normalize_overall_score()`：0 到 1 之间的小数按百分比换算，字符串与百分号
+形式一并处理，其余小数四舍五入。`0` 和 `1` 保持原样 —— 二者都是合法的 0-100 分数，
+无从判断模型用的是哪种量纲，不应擅自放大 100 倍。
+
+新增 9 条参数化测试覆盖上述各种形式。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+166 passed in 3.74s
+```
+
+修复后重跑同一组测量，不带 RAG 的那一组不再崩溃，正常返回 [40, 40, 50, 40]。
+
+系统性偏低这一现象记入 README 已知限制与实施计划的技术债，供仓库所有者判断是否
+需要处理。本条不改变打分逻辑本身。
 

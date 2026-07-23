@@ -98,8 +98,36 @@ def normalize_model_data(model_cls: type[Any], data: dict) -> dict:
     return normalized
 
 
+def normalize_overall_score(value: object) -> object:
+    """Put a score onto the 0-100 scale the schema expects.
+
+    Observed from the real model: `"overall_score": 0.4`, meaning 40 percent on
+    a 0-1 scale. Pydantic rejects a float with a fractional part, so the node
+    discarded the model's answer and fell back, quietly turning a scoring
+    difference into a scoring failure.
+
+    A bare 0 or 1 is left alone: those are valid 0-100 scores and there is no
+    way to tell which scale was meant.
+    """
+
+    if isinstance(value, str):
+        text = value.strip().rstrip("%")
+        try:
+            value = float(text)
+        except ValueError:
+            return value
+
+    if isinstance(value, float):
+        if 0 < value < 1:
+            return round(value * 100)
+        return round(value)
+    return value
+
+
 def normalize_match_report(data: dict) -> dict:
     normalized = dict(data)
+    if "overall_score" in normalized:
+        normalized["overall_score"] = normalize_overall_score(normalized["overall_score"])
     if isinstance(normalized.get("relevant_projects"), list):
         normalized["relevant_projects"] = [
             project_name(item) for item in normalized["relevant_projects"]
