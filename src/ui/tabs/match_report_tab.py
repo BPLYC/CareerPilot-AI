@@ -20,11 +20,26 @@ def render(state: dict | None) -> None:
         use_container_width=True,
         help="Match report, bullet suggestions, application answers, and interview questions.",
     )
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Match Score", f"{report['overall_score']}/100")
-    col2.metric("Matched Skills", len(report["matched_skills"]))
-    col3.metric("Missing Skills", len(report["missing_skills"]))
-    st.progress(report["overall_score"] / 100)
+    reference = state.get("reference_score")
+    score = report["overall_score"]
+    show_reference = reference is not None and reference != score
+
+    if show_reference:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("AI Score", f"{score}/100")
+        col2.metric("Rule-based Score", f"{reference}/100")
+        col3.metric("Matched Skills", len(report["matched_skills"]))
+        col4.metric("Missing Skills", len(report["missing_skills"]))
+        st.caption(
+            "Two scores: the AI's assessment and a deterministic rule-based baseline. "
+            "They usually differ; when they diverge sharply, the skills below are the more reliable read."
+        )
+    else:
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Match Score", f"{score}/100")
+        col2.metric("Matched Skills", len(report["matched_skills"]))
+        col3.metric("Missing Skills", len(report["missing_skills"]))
+    st.progress(score / 100)
 
     for warning in state.get("warnings", []):
         st.warning(warning)

@@ -45,10 +45,17 @@ def _match_section(state: dict) -> list[str]:
     if not report:
         return []
 
+    score = report.get("overall_score", 0)
+    reference = state.get("reference_score")
+    if reference is not None and reference != score:
+        score_line = f"**Score:** {score}/100 (AI) · {reference}/100 (rule-based baseline)"
+    else:
+        score_line = f"**Score:** {score}/100"
+
     lines = [
         "## Match Report",
         "",
-        f"**Score:** {report.get('overall_score', 0)}/100",
+        score_line,
         "",
         "### Matched skills",
         *_bullet_list(report.get("matched_skills", []), "None identified."),

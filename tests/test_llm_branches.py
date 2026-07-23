@@ -122,7 +122,10 @@ def test_match_scoring_uses_the_model_response(use_llm):
 
     assert _succeeded(update)
     assert update["match_report"]["overall_score"] == 88
-    assert update["warnings"] == []
+    # A high score raises no low-match warning. It may raise a gap warning,
+    # since the deterministic baseline for this fixture scores far below 88 --
+    # that is the score-alignment behaviour, exercised in test_score_alignment.
+    assert not any("Low match score" in w for w in update["warnings"])
 
 
 def test_match_scoring_warns_on_a_low_model_score(use_llm):
