@@ -32,6 +32,12 @@ Read these files first:
 - **`tests/conftest.py` clears the API key for every test.** A test meaning to
   exercise the LLM branch must patch `src.agents.common.can_use_llm`, or it will
   pass while testing the fallback instead.
+- **The Chroma vectorstore is not the better retrieval path by default.**
+  `LocalHashEmbeddings` buckets tokens by md5 into 64 dimensions: synonym
+  similarity is 0.000 and 839 tokens collide into those buckets 13-deep. Ranking
+  by term overlap beats it, so `has_semantic_embeddings()` skips the vectorstore
+  unless real embeddings are configured. Enabling Chroma is not an optimisation
+  here — measure before assuming otherwise.
 
 ## Current Status
 
@@ -299,5 +305,8 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 1. Regenerate the README screenshots; they predate the Compare Jobs tab and the
    report export button.
 2. Optionally add a short demo GIF if the README needs a walkthrough.
-3. Optional: embedding-based ranking through the Chroma path. Retrieval ranks by
-   term overlap with the section heading weighted, which misses synonyms.
+3. Synonym-aware retrieval, if it is ever wanted, needs a real embedding model.
+   Do not reach for the Chroma path expecting this: with the default
+   `LocalHashEmbeddings` it is measurably worse than term overlap, which is why
+   `has_semantic_embeddings()` now gates it. It requires `EMBEDDING_PROVIDER=openai`
+   or a local sentence-transformer; DeepSeek has no embeddings endpoint.

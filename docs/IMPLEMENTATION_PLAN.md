@@ -178,6 +178,7 @@ the measurements that contradicted the original plan.
 | 8 | Markdown report export |
 | 9 | Multi-JD comparison |
 | 10 | RAG retrieval made selective (added after the first nine merged) |
+| 11 | Vectorstore gated off when embeddings are hash-based, which retrieved worse |
 
 Slice 10 corrected a diagnosis made in the earlier slices. The RAG problem had
 been recorded as "the knowledge base is too small". The corpus size was a
@@ -299,8 +300,9 @@ Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 Known technical debt:
 
 - README screenshots predate the Compare Jobs tab and the export button.
-- Retrieval ranks by term overlap with the section heading weighted. Synonyms
-  that exact matching misses would need the embedding path through Chroma.
+- Synonym-aware retrieval needs a real embedding model. The Chroma path does not
+  provide it: with the default hash embeddings, synonym similarity measures
+  0.000 and retrieval ranks worse than term overlap, so it is gated off.
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct
   smoke test; full multi-node workflow use should remain selective because it is
   slow. `DEEPSEEK_REQUEST_TIMEOUT` now exists for that case.

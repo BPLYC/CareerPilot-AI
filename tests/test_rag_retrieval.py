@@ -10,10 +10,16 @@ Software Engineering bullets shared one chunk and no query could separate them.
 import pytest
 
 from src.agents.jd_analyzer_agent import fallback_analyze_jd
-from src.rag.build_vectorstore import DISABLE_VECTORSTORE_ENV
+from src.rag.build_vectorstore import (
+    DISABLE_VECTORSTORE_ENV,
+    FORCE_VECTORSTORE_ENV,
+    get_or_build_vectorstore,
+    has_semantic_embeddings,
+)
 from src.rag.knowledge_loader import load_all_knowledge_docs, split_markdown
 from src.rag.retriever import retrieve_context, retrieve_snippets
 from src.services.evaluation import rag_corpus_fraction
+from src.services.llm_client import LocalHashEmbeddings
 from src.ui.sample_data import SAMPLE_JDS, read_text
 
 # retrieve_context asks for these per collection.
@@ -155,3 +161,52 @@ def test_corpus_fraction_is_one_when_retrieval_had_no_choice():
 def test_corpus_fraction_is_clamped_and_handles_empty_input():
     assert rag_corpus_fraction({}) == 0.0
     assert rag_corpus_fraction({"c": ["s"] * 10_000}) == 1.0
+
+
+# --- vectorstore gating ---------------------------------------------------
+
+
+def test_hash_embeddings_are_not_treated_as_semantic():
+    assert has_semantic_embeddings() is False
+
+
+@pytest.mark.parametrize(
+    ("query", "unrelated"),
+    [
+        ("pytorch", "deep learning framework"),
+        ("sql", "relational database queries"),
+    ],
+)
+def test_hash_embeddings_capture_no_synonyms(query, unrelated):
+    """The measurement behind skipping the vectorstore by default."""
+
+    embeddings = LocalHashEmbeddings()
+    a = embeddings.embed_query(query)
+    b = embeddings.embed_query(unrelated)
+
+    assert sum(x * y for x, y in zip(a, b, strict=True)) == 0.0
+
+
+def test_vectorstore_is_skipped_when_embeddings_are_hash_based(monkeypatch):
+    # Whether data/vectorstore/ exists is machine-local, so on a machine that
+    # has run the app this gate is what keeps retrieval on the better path.
+    monkeypatch.delenv(DISABLE_VECTORSTORE_ENV, raising=False)
+    monkeypatch.delenv(FORCE_VECTORSTORE_ENV, raising=False)
+
+    assert get_or_build_vectorstore() is None
+
+
+def test_vectorstore_can_still_be_forced(monkeypatch):
+    monkeypatch.delenv(DISABLE_VECTORSTORE_ENV, raising=False)
+    monkeypatch.setenv(FORCE_VECTORSTORE_ENV, "1")
+
+    # Either a store or None if chromadb is absent; the point is that the
+    # embedding gate no longer short-circuits it.
+    get_or_build_vectorstore()
+
+
+def test_disable_beats_force(monkeypatch):
+    monkeypatch.setenv(DISABLE_VECTORSTORE_ENV, "1")
+    monkeypatch.setenv(FORCE_VECTORSTORE_ENV, "1")
+
+    assert get_or_build_vectorstore() is None

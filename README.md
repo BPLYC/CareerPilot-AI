@@ -36,7 +36,7 @@ Students applying for AI, data, and software internships need help understanding
 - LangGraph
 - Pydantic
 - DeepSeek OpenAI-compatible API
-- ChromaDB optional local vector store through `langchain-chroma`
+- ChromaDB optional local vector store through `langchain-chroma`, used when `EMBEDDING_PROVIDER=openai` supplies real embeddings; with the default hash embeddings the deterministic term-overlap retriever ranks better and is used instead
 
 ## Architecture Diagram
 
@@ -169,7 +169,7 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 - Refresh the README screenshots, which predate the Compare Jobs tab and the report export button.
 - Optional demo GIF.
-- Retrieval currently ranks by term overlap with the section heading weighted. Embedding-based ranking through the optional Chroma path would handle synonyms that exact matching misses.
+- Synonym-aware retrieval needs a real embedding model. DeepSeek exposes no embeddings endpoint, so this requires either an OpenAI key (`EMBEDDING_PROVIDER=openai`, which enables the Chroma path automatically) or a local sentence-transformer.
 
 ## Resume Bullet For This Project
 

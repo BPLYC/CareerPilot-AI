@@ -991,3 +991,99 @@ reproducible: True
 
 本条无 API 调用，不产生费用。
 
+## Slice 11: 停止默认使用会降低质量的向量库路径
+
+### 我在 Future Work 里写错了一条
+
+Slice 10 结束时，我把剩余工作记为「检索用词项匹配，同义词会漏；走 Chroma 的
+embedding 路径可以解决」。着手前先做验证，**这条是错的**。
+
+`get_embeddings()` 默认返回 `LocalHashEmbeddings`（`EMBEDDING_PROVIDER=local_hash`，
+项目是 DeepSeek-only，没有配置 OpenAI embedding）。它把每个 token 用 md5 映射到
+64 个桶之一然后计数 —— 是哈希词袋，不是语义向量。实测：
+
+```text
+default embeddings: LocalHashEmbeddings | dims: 64
+
+cosine similarity under local_hash:
+  'pytorch'  vs 'deep learning framework'     = 0.000
+  'sql'      vs 'relational database queries' = 0.000
+  'rest api' vs 'http endpoint'               = 0.000
+  'pytorch'  vs 'pytorch'                     = 1.000
+```
+
+三组同义词相似度全为 0.000。**零同义词能力**，所以这条路径根本无法交付我承诺的
+效果。
+
+碰撞问题同样严重：
+
+```text
+vocabulary: 839 distinct tokens into 64 buckets
+average tokens per bucket: 13.1
+busiest bucket holds 20 tokens, e.g. ['applied', 'causation', 'confirmed',
+                                      'crud', 'debug', 'docker:', 'finding', 'hugging']
+```
+
+平均 13 个词共用一个维度，`docker` 与 `causation`、`hugging` 成为同一个特征。
+
+### 由此发现的真实缺陷
+
+既然哈希向量既无语义又高度碰撞，那么走 Chroma 的检索质量应当低于词项匹配。
+实测对比（重建向量库后，同一份知识库、同样三个样例 JD）：
+
+```text
+===== markdown scorer =====
+SWE Intern   bullets: ['Software Engineering', 'Backend And API', 'Data Engineering', ...]
+             skills : ['Software Engineering', 'Programming Languages', 'Cloud And DevOps']
+Data Analyst skills : ['Databases', 'Data Tools', 'Programming Languages']
+
+===== chroma + local_hash =====
+SWE Intern   bullets: ['Data Analysis', 'Backend And API', 'Machine Learning',
+                       'Deep Learning', 'Software Engineering']
+             skills : ['Visualization', 'Databases', 'Data Tools']
+Data Analyst skills : ['Visualization', 'Databases', 'Data Tools']
+```
+
+Chroma 路径下：
+
+- 后端岗位的首选 bullet 变成「Data Analysis」，「Software Engineering」跌到第 5 位。
+- 后端岗位的技能片段里既没有 Software Engineering 也没有 Cloud And DevOps，取而代之
+  的是 Visualization。
+- 数据分析岗与软件工程岗拿到**完全相同**的技能片段 —— 无法区分。
+
+而 `retrieve_snippets()` 是**优先**使用向量库的，只要 `data/vectorstore/` 存在即生效。
+该目录是 gitignore 的机器本地状态，运行过应用的机器上就会有。也就是说在实际使用中，
+检索走的是更差的那条路径 —— 这个缺陷此前一直存在，只是知识库过小时（每次返回全部
+内容）无从暴露。
+
+### 改动
+
+`get_or_build_vectorstore()` 现在在嵌入不具备语义时返回 `None`，即跳过向量库。
+新增 `has_semantic_embeddings()` 判断，逻辑与依据写在其 docstring 中。
+
+向量库路径本身保留：配置 `EMBEDDING_PROVIDER=openai` 后自动启用。也可用
+`CAREERPILOT_FORCE_VECTORSTORE=1` 强制启用哈希向量路径（用于演示或调试）。
+`CAREERPILOT_DISABLE_VECTORSTORE` 优先级高于强制开关。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+155 passed in 3.00s
+
+$ python eval/run_eval.py
+(评估输出无变化 —— 评估本就强制走 markdown 路径)
+```
+
+新增 6 条测试：哈希嵌入不被判定为语义嵌入、同义词相似度为 0、默认跳过向量库、
+强制开关有效、禁用优先于强制。
+
+需要说明的是：这不能算「解决了同义词问题」。同义词检索需要真正的嵌入模型，而
+DeepSeek 未提供 embedding 接口，因此在当前 provider 下无法实现。本条做的是**停止
+使用一个比现有方案更差的路径**，并把判断依据写进代码，避免下一个人重新踩进去。
+
+本条无 API 调用，不产生费用。
+
