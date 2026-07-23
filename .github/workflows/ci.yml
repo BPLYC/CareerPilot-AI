@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        # The suite must pass without a DEEPSEEK_API_KEY. Agents fall back to
+        # deterministic implementations, so a green run here proves the offline
+        # path still works.
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: pytest -q
+
+      - name: Evaluation smoke run
+        # Regenerates the evaluation CSVs on the deterministic path. Catches
+        # breakage in the eval harness that the unit tests do not cover.
+        run: python eval/run_eval.py
+
+      - name: Check evaluation output was produced
+        run: |
+          test -s outputs/evaluation_results.csv
+          test -s outputs/evaluation_comparison_summary.csv

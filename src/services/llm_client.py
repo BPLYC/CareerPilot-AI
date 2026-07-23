@@ -1,7 +1,6 @@
 """LLM and embedding client factories."""
 
 import hashlib
-from typing import List
 
 from src.services.provider_config import get_provider_config
 
@@ -12,7 +11,7 @@ class LocalHashEmbeddings:
     def __init__(self, size: int = 64):
         self.size = size
 
-    def _embed(self, text: str) -> List[float]:
+    def _embed(self, text: str) -> list[float]:
         vector = [0.0] * self.size
         tokens = (text or "").lower().split()
         for token in tokens:
@@ -22,10 +21,10 @@ class LocalHashEmbeddings:
         norm = sum(value * value for value in vector) ** 0.5 or 1.0
         return [value / norm for value in vector]
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         return [self._embed(text) for text in texts]
 
-    def embed_query(self, text: str) -> List[float]:
+    def embed_query(self, text: str) -> list[float]:
         return self._embed(text)
 
 
@@ -44,8 +43,8 @@ def get_llm(model: str = "", temperature: float = 0.3):
         "model": config.model,
         "api_key": config.api_key,
         "base_url": config.base_url,
-        "max_retries": 2,
-        "request_timeout": 60,
+        "max_retries": config.max_retries,
+        "request_timeout": config.request_timeout,
     }
     if thinking_enabled:
         kwargs["reasoning_effort"] = config.reasoning_effort

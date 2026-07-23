@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 HISTORY_DB_PATH = os.path.join("outputs", "history.sqlite3")
 
@@ -74,7 +73,7 @@ def summarize_state(state: dict[str, Any]) -> dict[str, Any]:
 def record_run(cache_key: str, state: dict[str, Any], db_path: str = HISTORY_DB_PATH) -> int:
     initialize_history(db_path)
     summary = summarize_state(state)
-    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    created_at = datetime.now(UTC).isoformat(timespec="seconds")
     with _connect(db_path) as conn:
         cursor = conn.execute(
             """

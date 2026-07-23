@@ -3,23 +3,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from numbers import Number
-from typing import Callable
 
 from src.agents.application_answer_agent import application_answer_node
 from src.agents.final_report_agent import final_report_node
 from src.agents.interview_coach_agent import interview_coach_node
-from src.agents.jd_analyzer_agent import jd_analyzer_node
-from src.agents.jd_analyzer_agent import fallback_analyze_jd
-from src.agents.match_scoring_agent import match_scoring_node
-from src.agents.match_scoring_agent import fallback_score_match
+from src.agents.jd_analyzer_agent import fallback_analyze_jd, jd_analyzer_node
+from src.agents.match_scoring_agent import fallback_score_match, match_scoring_node
 from src.agents.resume_optimizer_agent import resume_optimizer_node
-from src.agents.resume_parser_agent import resume_parser_node
-from src.agents.resume_parser_agent import fallback_parse_resume
+from src.agents.resume_parser_agent import fallback_parse_resume, resume_parser_node
 from src.services.evaluation import evaluate_state
 from src.workflow.careerpilot_graph import run_workflow
 from src.workflow.state import create_initial_state
-
 
 METHOD_BASELINE = "Baseline"
 METHOD_LLM_ONLY = "LLM-only"

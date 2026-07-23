@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Type
+from typing import Any
 
 
 def extract_json_object(text: str) -> str:
@@ -24,11 +24,11 @@ def model_to_dict(model_instance: Any) -> dict:
     return model_instance.dict()
 
 
-def validate_json(model_cls: Type[Any], text: str) -> Any:
+def validate_json(model_cls: type[Any], text: str) -> Any:
     return validate_dict(model_cls, loads_json(text))
 
 
-def validate_dict(model_cls: Type[Any], data: dict) -> Any:
+def validate_dict(model_cls: type[Any], data: dict) -> Any:
     data = normalize_model_data(model_cls, data)
     if hasattr(model_cls, "model_validate"):
         return model_cls.model_validate(data)
@@ -39,7 +39,7 @@ def loads_json(text: str) -> Any:
     return json.loads(extract_json_object(text))
 
 
-def normalize_model_data(model_cls: Type[Any], data: dict) -> dict:
+def normalize_model_data(model_cls: type[Any], data: dict) -> dict:
     """Tolerate small LLM schema deviations without accepting new facts."""
 
     if not isinstance(data, dict):

@@ -1,32 +1,32 @@
 """LangGraph state and initialization helpers."""
 
 from operator import add
-from typing import Annotated, Any, Dict, List, Optional, TypedDict
+from typing import Annotated, Any, TypedDict
 
 
 class CareerPilotState(TypedDict):
     raw_resume_text: str
     raw_jd_text: str
-    resume_profile: Optional[dict]
-    jd_analysis: Optional[dict]
+    resume_profile: dict | None
+    jd_analysis: dict | None
     retrieved_context: dict
-    match_report: Optional[dict]
-    optimized_bullets: List[dict]
+    match_report: dict | None
+    optimized_bullets: list[dict]
     has_exaggeration: bool
     reflection_feedback: str
     reflection_iteration: int
-    application_questions: List[str]
-    application_answers: Dict[str, Any]
-    interview_questions: List[dict]
-    workflow_trace: Annotated[List[str], add]
-    errors: Annotated[List[str], add]
-    warnings: Annotated[List[str], add]
+    application_questions: list[str]
+    application_answers: dict[str, Any]
+    interview_questions: list[dict]
+    workflow_trace: Annotated[list[str], add]
+    errors: Annotated[list[str], add]
+    warnings: Annotated[list[str], add]
 
 
 def create_initial_state(
     resume_text: str,
     jd_text: str,
-    application_questions: Optional[List[str]] = None,
+    application_questions: list[str] | None = None,
 ) -> CareerPilotState:
     return {
         "raw_resume_text": resume_text or "",

@@ -1,7 +1,7 @@
 """Text cleaning, truncation, and simple keyword utilities."""
 
 import re
-from typing import Iterable, List, Tuple
+from collections.abc import Iterable
 
 
 def clean_text(text: str) -> str:
@@ -11,7 +11,7 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def truncate_text(text: str, max_chars: int = 16000) -> Tuple[str, bool]:
+def truncate_text(text: str, max_chars: int = 16000) -> tuple[str, bool]:
     text = text or ""
     if len(text) <= max_chars:
         return text, False
@@ -32,7 +32,7 @@ def contains_keyword(text: str, keyword: str) -> bool:
     return normalize_token(keyword) in {normalize_token(token) for token in normalized_text.split()}
 
 
-def unique_preserve_order(values: Iterable[str]) -> List[str]:
+def unique_preserve_order(values: Iterable[str]) -> list[str]:
     seen = set()
     result = []
     for value in values:

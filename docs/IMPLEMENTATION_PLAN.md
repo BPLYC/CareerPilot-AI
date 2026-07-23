@@ -160,6 +160,46 @@ Remaining quality work:
 - Expanded tests for real LLM schema failures and end-to-end UI workflows.
 - Optional short demo GIF.
 
+## Optimization Round, 2026-07-23
+
+Nine slices on branch `claude/project-optimization-e559bf`, one commit each.
+`docs/OPTIMIZATION_LOG.md` records the evidence behind every change, including
+the measurements that contradicted the original plan.
+
+| Slice | Change |
+| --- | --- |
+| 1 | ruff, GitHub Actions CI, and a reproducible evaluation harness |
+| 2 | `common.run_node()` replacing six copies of the LLM/fallback control flow |
+| 3 | JSON-rendered prompt context; skill taxonomy moved to its own module |
+| 4 | The compiled LangGraph put on the real execution path |
+| 5 | Concurrent intake nodes; configurable timeout and retries |
+| 6 | Parser and LLM-branch test coverage |
+| 7 | `app.py` split into `src/ui/`; provider overrides scoped to a run |
+| 8 | Markdown report export |
+| 9 | Multi-JD comparison |
+
+Defects found and fixed along the way:
+
+- Evaluation called the real API on every run and returned different numbers
+  each time, while being documented as reproducible. It is now deterministic by
+  default and takes `--live`.
+- The low-match warning was dropped when an LLM failure fell back to a sub-45
+  score, so the UI lost the notice telling the applicant the role was a poor fit.
+- Sensitive-question boundaries were enforced only on the success path.
+- The job title regex was greedy and returned everything up to the last
+  "Intern" in the document. That title shows in the Match Report and Run
+  History and feeds the RAG query.
+- The sensitive-question reminder rendered before any analysis had run.
+
+Three claims in the original plan were wrong and are corrected in the log:
+the duplicated control flow was in six nodes rather than ten; Python `repr` in
+prompts costs the same tokens as JSON, so the reason to fix it is format
+consistency rather than cost; and the two engines already agreed before slice 4,
+so the accepted behaviour risk did not materialise.
+
+Verification at the end of the round: `ruff check .` clean, 132 tests passing
+(from 26), evaluation output byte-identical across runs.
+
 ## Current Status
 
 The MVP is implemented and locally stabilized. Phase 2 application/interview expansion, evaluation metrics, RAG dependency cleanup, parallel execution, summary-only run history, comparison evaluation, and README screenshots are implemented. The project is still a local demo rather than a production service.
@@ -237,18 +277,24 @@ Near-term MVP follow-up:
 - Use non-thinking mode for the local demo path unless the user specifically wants slower reasoning output.
 - README screenshots were captured on 2026-06-12 with local Chrome headless and added under `docs/assets/`.
 
-Phase 2 follow-up:
+Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 
-- Do focused Streamlit UI polish based on manual testing.
-- Add parser-specific tests and edge-case coverage for TXT, PDF, and DOCX uploads.
-- Expand tests around real LLM parsing failures and end-to-end UI workflows.
-- Optionally add a short demo GIF.
+- [x] Streamlit UI polish. `app.py` split into `src/ui/`; the unconditional
+      sensitive-question reminder fixed.
+- [x] Parser edge-case coverage. `tests/test_parsers.py`.
+- [x] Tests for LLM schema failures and end-to-end UI. `tests/test_llm_branches.py`
+      and `tests/test_app_renders.py`.
+- [ ] Optional short demo GIF.
 
 Known technical debt:
 
-- DeepSeek thinking mode with high reasoning effort is verified only for a direct smoke test; full multi-node workflow use should remain selective because it is slow.
-- File upload parsers have basic implementation coverage but need dedicated edge-case tests.
-- Real LLM schema failures and end-to-end UI workflows need broader automated coverage.
+- The RAG knowledge base holds 8 chunks while `retrieve_context()` requests 16,
+  so retrieval always returns everything and the `rag_snippet_count` metric does
+  not measure retrieval quality. This is content work, not code.
+- README screenshots predate the Compare Jobs tab and the export button.
+- DeepSeek thinking mode with high reasoning effort is verified only for a direct
+  smoke test; full multi-node workflow use should remain selective because it is
+  slow. `DEEPSEEK_REQUEST_TIMEOUT` now exists for that case.
 
 Resolved during current stabilization:
 

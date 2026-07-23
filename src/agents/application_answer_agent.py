@@ -1,10 +1,9 @@
 """Application answer drafting node."""
 
-from src.agents.common import can_use_llm, invoke_structured
+from src.agents.common import invoke_structured, run_node
 from src.models.schemas import ApplicationAnswerSet, ApplicationQuestionAnswer
-from src.services.prompts import APPLICATION_ANSWER_SYSTEM, schema_instruction
+from src.services.prompts import APPLICATION_ANSWER_SYSTEM, context_block, schema_instruction
 from src.services.structured_output import model_to_dict
-
 
 SENSITIVE_NOTICE = (
     "Visa, work authorization, sponsorship, salary, and legal eligibility answers "
@@ -129,31 +128,34 @@ def application_answer_node(state) -> dict:
     jd_analysis = state.get("jd_analysis") or {}
     match_report = state.get("match_report") or {}
     application_questions = state.get("application_questions") or []
-    try:
-        if can_use_llm():
-            user_prompt = (
-                schema_instruction(
-                    "ApplicationAnswerSet",
-                    "why_this_role,key_strengths,project_example,custom_answers,review_notice",
-                )
-                + "\nUse only verified evidence. Do not answer sensitive eligibility questions.\n"
-                + "For each requested application question, add one custom_answers item with question, answer, and review_notice.\n"
-                f"Resume profile: {resume_profile}\nJD analysis: {jd_analysis}\n"
-                f"Match report: {match_report}\nApplication questions: {application_questions}\n"
-                f"RAG context: {state.get('retrieved_context', {})}"
+
+    def from_llm() -> dict:
+        user_prompt = (
+            schema_instruction(
+                "ApplicationAnswerSet",
+                "why_this_role,key_strengths,project_example,custom_answers,review_notice",
             )
-            answers = invoke_structured(ApplicationAnswerSet, APPLICATION_ANSWER_SYSTEM, user_prompt)
-        else:
-            answers = fallback_application_answers(resume_profile, jd_analysis, match_report, application_questions)
-        answers = enforce_sensitive_question_boundaries(answers, application_questions)
-        return {
-            "application_answers": answers,
-            "workflow_trace": ["ApplicationAnswerNode: Drafted conservative application answer starters."],
-        }
-    except Exception as exc:
-        answers = fallback_application_answers(resume_profile, jd_analysis, match_report, application_questions)
-        return {
-            "application_answers": answers,
-            "errors": [f"ApplicationAnswerNode failed and used fallback answers: {exc}"],
-            "workflow_trace": ["ApplicationAnswerNode: Fallback application answers completed."],
-        }
+            + "\nUse only verified evidence. Do not answer sensitive eligibility questions.\n"
+            + "For each requested application question, add one custom_answers item with question, answer, and review_notice.\n"
+            + context_block(
+                resume_profile=resume_profile,
+                jd_analysis=jd_analysis,
+                match_report=match_report,
+                application_questions=application_questions,
+                rag_context=state.get("retrieved_context", {}),
+            )
+        )
+        return invoke_structured(ApplicationAnswerSet, APPLICATION_ANSWER_SYSTEM, user_prompt)
+
+    return run_node(
+        node_name="ApplicationAnswerNode",
+        output_key="application_answers",
+        llm_branch=from_llm,
+        fallback_branch=lambda: fallback_application_answers(
+            resume_profile, jd_analysis, match_report, application_questions
+        ),
+        describe=lambda _: "Drafted conservative application answer starters.",
+        # Runs on the fallback path too. These are the visa, sponsorship, and
+        # compensation boundaries, which must hold however the answers arrived.
+        refine=lambda answers: enforce_sensitive_question_boundaries(answers, application_questions),
+    )

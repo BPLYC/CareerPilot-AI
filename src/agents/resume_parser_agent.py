@@ -2,18 +2,12 @@
 
 import re
 
-from src.agents.common import can_use_llm, invoke_structured
+from src.agents.common import invoke_structured, run_node
 from src.models.schemas import ProjectExperience, ResumeProfile, WorkExperience
 from src.services.prompts import RESUME_PARSER_SYSTEM, schema_instruction
+from src.services.skill_taxonomy import find_known_skills
 from src.services.structured_output import model_to_dict
 from src.utils.text_utils import clean_text, truncate_text, unique_preserve_order
-
-
-KNOWN_SKILLS = [
-    "Python", "SQL", "scikit-learn", "pandas", "NumPy", "Git", "Flask", "Matplotlib",
-    "PyTorch", "TensorFlow", "Docker", "Tableau", "Java", "C++", "NLP", "React",
-    "FastAPI", "SQLite", "REST API", "Power BI", "Airflow", "Spark", "AWS", "GCP",
-]
 
 
 def _extract_name(text: str) -> str:
@@ -28,7 +22,7 @@ def fallback_parse_resume(text: str) -> dict:
     cleaned = clean_text(text)
     email_match = re.search(r"[\w.\-+]+@[\w.\-]+\.\w+", cleaned)
     phone_match = re.search(r"(\+?\d[\d\-\s()]{7,}\d)", cleaned)
-    skills = unique_preserve_order(skill for skill in KNOWN_SKILLS if skill.lower() in cleaned.lower())
+    skills = unique_preserve_order(find_known_skills(cleaned))
 
     projects = []
     project_patterns = [
@@ -63,32 +57,33 @@ def fallback_parse_resume(text: str) -> dict:
     return model_to_dict(profile)
 
 
+def _describe(profile: dict) -> str:
+    return (
+        f"Extracted {len(profile.get('projects', []))} projects, "
+        f"{len(profile.get('skills', []))} skills, {len(profile.get('work_experience', []))} work experiences."
+    )
+
+
 def resume_parser_node(state) -> dict:
     text, was_truncated = truncate_text(state.get("raw_resume_text", ""))
     warnings = ["Resume text was truncated to fit analysis limits."] if was_truncated else []
-    try:
-        if can_use_llm():
-            user_prompt = (
-                schema_instruction(
-                    "ResumeProfile",
-                    "name,email,phone,education,skills,projects,work_experience,publications,awards",
-                )
-                + "\nResume:\n"
-                + text
+
+    def from_llm() -> dict:
+        user_prompt = (
+            schema_instruction(
+                "ResumeProfile",
+                "name,email,phone,education,skills,projects,work_experience,publications,awards",
             )
-            profile = invoke_structured(ResumeProfile, RESUME_PARSER_SYSTEM, user_prompt)
-        else:
-            profile = fallback_parse_resume(text)
-        trace = (
-            f"ResumeParserNode: Extracted {len(profile.get('projects', []))} projects, "
-            f"{len(profile.get('skills', []))} skills, {len(profile.get('work_experience', []))} work experiences."
+            + "\nResume:\n"
+            + text
         )
-        return {"resume_profile": profile, "workflow_trace": [trace], "warnings": warnings}
-    except Exception as exc:
-        profile = fallback_parse_resume(text)
-        return {
-            "resume_profile": profile,
-            "errors": [f"ResumeParserNode failed and used fallback parser: {exc}"],
-            "warnings": warnings,
-            "workflow_trace": ["ResumeParserNode: Fallback parser completed."],
-        }
+        return invoke_structured(ResumeProfile, RESUME_PARSER_SYSTEM, user_prompt)
+
+    return run_node(
+        node_name="ResumeParserNode",
+        output_key="resume_profile",
+        llm_branch=from_llm,
+        fallback_branch=lambda: fallback_parse_resume(text),
+        describe=_describe,
+        base_update={"warnings": warnings},
+    )

@@ -3,7 +3,6 @@
 from src.services.scoring import keyword_coverage, skill_match_rate, star_coverage_rate
 from src.utils.text_utils import contains_keyword
 
-
 SENSITIVE_TERMS = (
     "visa",
     "work authorization",

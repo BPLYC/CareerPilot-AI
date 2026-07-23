@@ -3,8 +3,6 @@
 import hashlib
 import json
 import os
-from typing import Optional
-
 
 CACHE_DIR = os.path.join("outputs", "cache")
 CACHE_VERSION = "v3"
@@ -16,11 +14,11 @@ def get_cache_key(resume_text: str, jd_text: str, application_questions: list[st
     return hashlib.md5(content.encode("utf-8")).hexdigest()
 
 
-def load_from_cache(key: str) -> Optional[dict]:
+def load_from_cache(key: str) -> dict | None:
     path = os.path.join(CACHE_DIR, f"{key}.json")
     if not os.path.exists(path):
         return None
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         return json.load(handle)
 
 
