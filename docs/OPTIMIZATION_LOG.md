@@ -844,3 +844,150 @@ AI Intern:    missing = ['PyTorch', 'TensorFlow', 'NLP']
 
 本 slice 无 API 调用，不产生费用。
 
+## Slice 10: RAG 检索恢复选择性
+
+本条在前九个 slice 合并到 `integration/2026-07-optimization` 之后追加，处理此前
+被记为「超出范围」的那个问题。
+
+### 诊断修正了此前的判断
+
+前面几个 slice 把这个问题记录为「知识库只有 8 个 chunk，太小」。实际排查后发现，
+**语料规模只是表象，分块逻辑本身是坏的**。
+
+`split_markdown()` 按 1200 字符累积段落，完全不理会 markdown 标题。旧行为实测：
+
+```text
+total chunks: 8
+[resume_bullets] 914 chars | category=software_engineering
+                 | headings inside: ['# Machine Learning', '# Data Analysis', '# Software Engineering']
+[skill_taxonomy] 1112 chars | category=databases
+                 | headings inside: ['# Programming Languages', '# ML And AI', '# Data Tools',
+                                     '# Visualization', '# Cloud And DevOps', '# Software Engineering',
+                                     '# Databases']
+[skill_taxonomy]  160 chars | category=databases | headings inside: []
+```
+
+三个后果：
+
+1. **AI 岗和 SWE 岗的查询在原理上无法区分。** Machine Learning、Data Analysis、
+   Software Engineering 三节的 bullet 模板挤在同一个 chunk 里，无论查询是什么，
+   要么全拿到要么全拿不到。
+2. **`category` 元数据是错的。** 它只记录该 chunk 吸收的最后一个标题，因此上面
+   那个含三节内容的 chunk 被标为 `software_engineering`，描述错了自己三分之二的
+   内容。
+3. **存在孤儿 chunk。** 160 字符那一块没有任何标题，category 从上一块泄漏而来。
+
+所以只补内容而不修分块是无效的 —— 新内容同样会被揉进跨节的大块里。
+
+### 改动
+
+**分块按节切分。** `split_markdown()` 改为每个 markdown 标题起一个新 chunk，
+category 取自该 chunk 自己的标题。超过 `chunk_size` 的长节仍会继续切分，但每一片
+都重复标题，保证自描述。
+
+仅此一项改动：8 → 23 个 chunk，每个恰好一个标题，category 全部正确，孤儿块消失。
+
+**扩充知识库内容。** 新增的节是实习准备的实际内容，不是填充：
+
+- `resume_bullet_templates.md`：Deep Learning、NLP、Data Engineering、
+  Backend And API、Testing And Quality。
+- `interview_question_bank.md`：ML 概念、数据分析概念、软件工程概念、SQL 与数据库、
+  反问面试官的问题。
+- `star_method_examples.md`：学习新工具、需求不明、时间压力、API 集成、数据质量问题。
+- `application_question_examples.md`：项目举例、为何选择该公司、学习与成长、团队协作、
+  应对挫折、日程与出勤安排。
+
+内容遵循项目既有约束：不编造事实，不替用户回答签证与薪酬类问题。
+
+23 → 44 个 chunk。各 collection 与检索请求量的对比：
+
+| collection | 请求 k | 改动前可用 | 改动后可用 |
+| --- | --- | --- | --- |
+| resume_bullets | 5 | 2 | 10 |
+| star_examples | 3 | 2 | 10 |
+| skill_taxonomy | 3 | 2 | 7 |
+| application_examples | 2 | 1 | 9 |
+| interview_bank | 3 | 1 | 8 |
+
+**评分函数利用标题。** 每个 chunk 现在恰好对应一节，标题比正文任何一行都更能说明
+这节讲什么 ——「Backend And API」与「Deep Learning」两节都会提到 Python，只有标题
+能区分。`_score()` 现在把 category 匹配按 3 倍权重计入。
+
+### 效果
+
+同一份简历对三个样例 JD 的检索结果（`bullet_templates` 一列）：
+
+```text
+AI Intern    -> ['Machine Learning', 'Data Analysis', 'Deep Learning',
+                 'Software Engineering', 'Natural Language Processing']
+Data Analyst -> ['Data Analysis', 'Data Engineering', 'Machine Learning',
+                 'Software Engineering', 'Deep Learning']
+SWE Intern   -> ['Software Engineering', 'Backend And API', 'Data Engineering',
+                 'Machine Learning', 'Data Analysis']
+```
+
+SWE 岗拿到 Backend And API、API Integration、Cloud And DevOps；AI 岗拿到 ML And AI、
+Model Training、Deep Learning；Data Analyst 拿到 Data Engineering、Data Tools、
+Data Quality Issue。改动前三者拿到的是**完全相同**的内容。
+
+标题加权带来的增量：AI 与 Data Analyst 的 bullet 模板重合度从 5/5 降至 4/5。
+剩余重合是合理的 —— 两个岗位都以 Python 和 SQL 为主。
+
+### 指标本身也需要修
+
+把 `rag_snippet_count` 从 8 提到 16 不能说明问题已解决：语料 44 条、请求 16 条，
+这个计数从此恒为 16，依旧不衡量任何东西。「返回 8 条中的 8 条」和「返回 800 条中的
+8 条」是同一个数字，却是完全不同的行为。
+
+因此新增 `rag_corpus_fraction` —— 检索结果占语料总量的比例。1.0 意味着检索没有
+选择余地，越低说明选择性越强。
+
+```text
+method                 rag_snippet_count   rag_corpus_fraction
+Baseline                             0.0                   0.0
+LLM-only                             0.0                   0.0
+CareerPilot Full                    16.0                0.3636
+```
+
+改动前这一列会是 1.0。
+
+### 验证
+
+新增 `tests/test_rag_retrieval.py`（17 条）。为确认这些测试确实在验证行为而不是
+恒真，把源码与内容临时 stash 回旧版本后重跑：
+
+```text
+FAILED test_each_chunk_covers_exactly_one_section
+FAILED test_category_matches_the_heading_in_the_chunk
+FAILED test_sections_are_split_even_when_they_would_fit_one_chunk
+FAILED test_a_long_section_splits_but_keeps_its_heading
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[resume_bullets-5]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[star_examples-3]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[skill_taxonomy-3]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[application_examples-2]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[interview_bank-3]
+FAILED test_different_roles_retrieve_different_context
+FAILED test_retrieval_reflects_the_role
+FAILED test_retrieval_does_not_return_the_whole_corpus
+FAILED test_heading_matches_outrank_incidental_body_mentions
+```
+
+13 条在旧实现下失败。其中 `test_different_roles_retrieve_different_context` 的失败
+直接证明了旧代码下三个岗位拿到的上下文完全一致。
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+149 passed in 2.75s
+
+$ python eval/run_eval.py   （连续两次）
+reproducible: True
+```
+
+测试数从 132 增至 149。评估输出发生变化是**预期的** —— 这正是检索行为改变的体现，
+且连续两次运行仍逐字节一致。
+
+本条无 API 调用，不产生费用。
+

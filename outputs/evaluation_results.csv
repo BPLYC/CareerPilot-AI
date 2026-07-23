@@ -1,10 +1,10 @@
-case,method,keyword_coverage_before,keyword_coverage_after,keyword_coverage_delta,required_skills_match_rate,missing_skills_count,bullet_count_generated,reflection_revision_rate,star_coverage_rate,application_answer_count,custom_application_answer_count,sensitive_application_refusal_count,application_answer_evidence_rate,interview_question_count,interview_prep_notes_rate,interview_project_followup_count,interview_role_specific_count,interview_required_skill_evidence_count,rag_snippet_count,workflow_trace_count,reflection_review_count,phase_two_parallel_count
-case_1_ai_intern,Baseline,0.42857142857142855,0.42857142857142855,0.0,0.4,3,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,4,0,0
-case_1_ai_intern,LLM-only,0.42857142857142855,0.5714285714285714,0.14285714285714285,0.4,3,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,0,7,0,0
-case_1_ai_intern,CareerPilot Full,0.42857142857142855,0.5714285714285714,0.14285714285714285,0.4,3,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,8,10,1,1
-case_2_swe_intern,Baseline,0.3333333333333333,0.3333333333333333,0.0,0.5,2,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,4,0,0
-case_2_swe_intern,LLM-only,0.3333333333333333,0.5,0.16666666666666669,0.5,2,4,0.0,0.0,3,0,0,1.0,6,1.0,4,1,1,0,7,0,0
-case_2_swe_intern,CareerPilot Full,0.3333333333333333,0.5,0.16666666666666669,0.5,2,4,0.0,0.0,3,0,0,1.0,6,1.0,4,1,1,8,10,1,1
-case_3_data_analyst,Baseline,0.3333333333333333,0.3333333333333333,0.0,0.6666666666666666,1,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,4,0,0
-case_3_data_analyst,LLM-only,0.3333333333333333,0.5,0.16666666666666669,0.6666666666666666,1,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,0,7,0,0
-case_3_data_analyst,CareerPilot Full,0.3333333333333333,0.5,0.16666666666666669,0.6666666666666666,1,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,8,10,1,1
+case,method,keyword_coverage_before,keyword_coverage_after,keyword_coverage_delta,required_skills_match_rate,missing_skills_count,bullet_count_generated,reflection_revision_rate,star_coverage_rate,application_answer_count,custom_application_answer_count,sensitive_application_refusal_count,application_answer_evidence_rate,interview_question_count,interview_prep_notes_rate,interview_project_followup_count,interview_role_specific_count,interview_required_skill_evidence_count,rag_snippet_count,rag_corpus_fraction,workflow_trace_count,reflection_review_count,phase_two_parallel_count
+case_1_ai_intern,Baseline,0.42857142857142855,0.42857142857142855,0.0,0.4,3,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,0.0,4,0,0
+case_1_ai_intern,LLM-only,0.42857142857142855,0.5714285714285714,0.14285714285714285,0.4,3,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,0,0.0,7,0,0
+case_1_ai_intern,CareerPilot Full,0.42857142857142855,0.5714285714285714,0.14285714285714285,0.4,3,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,16,0.3636,10,1,1
+case_2_swe_intern,Baseline,0.3333333333333333,0.3333333333333333,0.0,0.5,2,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,0.0,4,0,0
+case_2_swe_intern,LLM-only,0.3333333333333333,0.5,0.16666666666666669,0.5,2,4,0.0,0.0,3,0,0,1.0,6,1.0,4,1,1,0,0.0,7,0,0
+case_2_swe_intern,CareerPilot Full,0.3333333333333333,0.5,0.16666666666666669,0.5,2,4,0.0,0.0,3,0,0,1.0,6,1.0,4,1,1,16,0.3636,10,1,1
+case_3_data_analyst,Baseline,0.3333333333333333,0.3333333333333333,0.0,0.6666666666666666,1,0,0.0,0.0,0,0,0,0.0,0,0.0,0,0,0,0,0.0,4,0,0
+case_3_data_analyst,LLM-only,0.3333333333333333,0.5,0.16666666666666669,0.6666666666666666,1,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,0,0.0,7,0,0
+case_3_data_analyst,CareerPilot Full,0.3333333333333333,0.5,0.16666666666666669,0.6666666666666666,1,4,0.0,0.0,3,0,0,1.0,6,1.0,4,2,0,16,0.3636,10,1,1

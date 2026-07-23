@@ -235,6 +235,14 @@ try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8501 -TimeoutSec 5 | S
 
 ## Architecture Notes
 
+Knowledge files are chunked **one chunk per markdown section**, and
+`chunk.metadata["category"]` comes from that section's own heading. Retrieval
+weights heading matches `HEADING_WEIGHT` times body matches, so headings are
+load-bearing: adding content under an existing heading extends that topic, while
+a new `#` heading creates a separately retrievable unit. `tests/test_rag_retrieval.py`
+asserts each collection holds more chunks than the retriever requests; if you add
+a collection, keep that true or retrieval has nothing to choose between.
+
 `careerpilot_graph.py` holds two engines. `stream_workflow()` prefers the
 compiled LangGraph and falls back to the sequential runner when langgraph is not
 installed. `tests/test_workflow_parity.py` pins them to the same results; if you
@@ -288,9 +296,8 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Grow the RAG knowledge base. It holds 8 chunks while `retrieve_context()`
-   requests 16, so retrieval always returns everything and the
-   `rag_snippet_count` comparison metric is not measuring retrieval quality.
-2. Regenerate the README screenshots; they predate the Compare Jobs tab and the
+1. Regenerate the README screenshots; they predate the Compare Jobs tab and the
    report export button.
-3. Optionally add a short demo GIF if the README needs a walkthrough.
+2. Optionally add a short demo GIF if the README needs a walkthrough.
+3. Optional: embedding-based ranking through the Chroma path. Retrieval ranks by
+   term overlap with the section heading weighted, which misses synonyms.

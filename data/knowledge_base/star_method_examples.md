@@ -17,3 +17,23 @@ Situation: A recommendation project needed a baseline model. Task: Compare simpl
 # Code Review
 
 Situation: A teammate's code was difficult to reuse. Task: Improve readability without changing behavior. Action: Suggested smaller functions and clearer variable names. Result: The team could debug the workflow more quickly.
+
+# Learning A New Tool
+
+Situation: A project required a framework the student had not used before. Task: Become productive quickly without stalling the team. Action: Worked through the official tutorial, built a small prototype, then applied the pattern to the real feature. Result: The feature shipped and the approach was documented for teammates.
+
+# Unclear Requirements
+
+Situation: A project brief left the expected output format ambiguous. Task: Avoid building the wrong thing. Action: Listed the possible interpretations, brought them to the instructor with a recommendation, and confirmed one before implementing. Result: The work was accepted without a rewrite.
+
+# Deadline Pressure
+
+Situation: Two coursework deadlines fell in the same week as a project milestone. Task: Deliver something usable rather than nothing complete. Action: Cut scope to the core workflow, communicated the reduced scope early, and finished that part properly. Result: The milestone was met and the deferred items were tracked openly.
+
+# API Integration
+
+Situation: An application needed data from an external service with rate limits. Task: Retrieve the data reliably without exceeding quota. Action: Added request batching, cached responses locally, and handled error codes explicitly. Result: The integration ran without hitting limits during the demo.
+
+# Data Quality Issue
+
+Situation: An analysis produced results that contradicted expectations. Task: Determine whether the finding was real or a data problem. Action: Traced the figure back to the source table and found duplicated joins inflating totals. Result: The corrected analysis changed the conclusion, and the check was added to the pipeline.

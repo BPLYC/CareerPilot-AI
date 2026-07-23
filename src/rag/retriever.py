@@ -3,16 +3,40 @@
 from src.rag.build_vectorstore import get_or_build_vectorstore
 from src.rag.knowledge_loader import load_all_knowledge_docs
 
+HEADING_WEIGHT = 3
 
-def _score(query: str, content: str) -> int:
-    query_terms = {term.lower().strip(",.") for term in query.split() if len(term) > 2}
+
+def _query_terms(query: str) -> set[str]:
+    return {term.lower().strip(",.") for term in query.split() if len(term) > 2}
+
+
+def _score(query: str, content: str, category: str = "") -> int:
+    """Rank a chunk against the query, weighting its section heading.
+
+    Each chunk is one markdown section, so its heading says what the section is
+    about far more reliably than any single line of the body. A "Backend And
+    API" section and a "Deep Learning" section both mention Python; only the
+    heading separates them.
+
+    Category matches count HEADING_WEIGHT times to reflect that.
+    """
+
+    terms = _query_terms(query)
     content_lower = content.lower()
-    return sum(1 for term in query_terms if term in content_lower)
+    body_score = sum(1 for term in terms if term in content_lower)
+
+    category_words = (category or "").replace("_", " ")
+    heading_score = sum(1 for term in terms if term in category_words)
+    return body_score + HEADING_WEIGHT * heading_score
 
 
 def fallback_retrieve(query: str, collection: str, k: int) -> list[str]:
     chunks = [chunk for chunk in load_all_knowledge_docs() if chunk.metadata.get("collection") == collection]
-    ranked = sorted(chunks, key=lambda chunk: _score(query, chunk.content), reverse=True)
+    ranked = sorted(
+        chunks,
+        key=lambda chunk: _score(query, chunk.content, chunk.metadata.get("category", "")),
+        reverse=True,
+    )
     return [chunk.content for chunk in ranked[:k]]
 
 

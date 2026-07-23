@@ -21,6 +21,28 @@ FIXED_APPLICATION_FIELDS = ("why_this_role", "key_strengths", "project_example")
 ROLE_SPECIFIC_FOCUS_AREAS = {"ml evaluation", "analytics validation", "software engineering"}
 
 
+def rag_corpus_fraction(retrieved_context: dict) -> float:
+    """How much of the knowledge base one query pulled back.
+
+    A snippet count alone says nothing about retrieval: returning 8 of 8
+    available chunks and returning 8 of 800 are the same number and completely
+    different behaviours. This divides what was retrieved by what existed, so
+    1.0 means retrieval had no choice and lower values mean it selected.
+    """
+
+    if not retrieved_context:
+        return 0.0
+
+    from src.rag.knowledge_loader import load_all_knowledge_docs
+
+    corpus_size = len(load_all_knowledge_docs())
+    if not corpus_size:
+        return 0.0
+
+    retrieved = sum(len(items) for items in retrieved_context.values())
+    return round(min(retrieved / corpus_size, 1.0), 4)
+
+
 def _is_sensitive_question(question: str) -> bool:
     lowered = (question or "").lower()
     return any(term in lowered for term in SENSITIVE_TERMS)
@@ -127,6 +149,7 @@ def evaluate_state(state: dict) -> dict:
             1 for item in interview_questions if (item.get("focus_area") or "").lower() == "required skill evidence"
         ),
         "rag_snippet_count": sum(len(items) for items in retrieved_context.values()),
+        "rag_corpus_fraction": rag_corpus_fraction(retrieved_context),
         "workflow_trace_count": len(workflow_trace),
         "reflection_review_count": sum(1 for item in workflow_trace if "ReflectionNode" in item),
         "phase_two_parallel_count": sum(1 for item in workflow_trace if "PhaseTwoParallelNode" in item),

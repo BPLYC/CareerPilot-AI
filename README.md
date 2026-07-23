@@ -8,7 +8,7 @@ CareerPilot AI uses a real workflow rather than one long prompt:
 
 - Conditional routing sends low-fit jobs to a warning path and skips resume optimization.
 - A reflection node checks generated bullets for unsupported claims and can loop back to the optimizer.
-- A local RAG knowledge base supplies resume bullet templates, STAR examples, and skill taxonomy snippets.
+- A local RAG knowledge base supplies resume bullet templates, STAR examples, and skill taxonomy snippets, chunked per section so an AI role and a backend role retrieve different material.
 - Evaluation metrics make the output measurable.
 
 ## Problem Statement
@@ -167,9 +167,9 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Future Work
 
-- Grow the RAG knowledge base. It currently holds 8 chunks while retrieval requests 16, so every query returns everything and the `rag_snippet_count` metric does not measure retrieval quality.
 - Refresh the README screenshots, which predate the Compare Jobs tab and the report export button.
 - Optional demo GIF.
+- Retrieval currently ranks by term overlap with the section heading weighted. Embedding-based ranking through the optional Chroma path would handle synonyms that exact matching misses.
 
 ## Resume Bullet For This Project
 

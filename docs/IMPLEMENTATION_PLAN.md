@@ -177,6 +177,16 @@ the measurements that contradicted the original plan.
 | 7 | `app.py` split into `src/ui/`; provider overrides scoped to a run |
 | 8 | Markdown report export |
 | 9 | Multi-JD comparison |
+| 10 | RAG retrieval made selective (added after the first nine merged) |
+
+Slice 10 corrected a diagnosis made in the earlier slices. The RAG problem had
+been recorded as "the knowledge base is too small". The corpus size was a
+symptom: `split_markdown()` accumulated paragraphs to 1200 characters ignoring
+markdown headings, so Machine Learning, Data Analysis, and Software Engineering
+bullets shared one chunk and no query could separate them, while `category`
+recorded only the last heading absorbed. Chunking per section, growing the
+content, and weighting heading matches made retrieval selective; a new
+`rag_corpus_fraction` metric measures that, because a snippet count cannot.
 
 Defects found and fixed along the way:
 
@@ -288,10 +298,9 @@ Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 
 Known technical debt:
 
-- The RAG knowledge base holds 8 chunks while `retrieve_context()` requests 16,
-  so retrieval always returns everything and the `rag_snippet_count` metric does
-  not measure retrieval quality. This is content work, not code.
 - README screenshots predate the Compare Jobs tab and the export button.
+- Retrieval ranks by term overlap with the section heading weighted. Synonyms
+  that exact matching misses would need the embedding path through Chroma.
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct
   smoke test; full multi-node workflow use should remain selective because it is
   slow. `DEEPSEEK_REQUEST_TIMEOUT` now exists for that case.
