@@ -66,3 +66,22 @@ def test_fresh_run_records_history_exactly_once(fake_st, monkeypatch):
 
     assert result is not None
     assert len(recorded) == 1
+
+
+def test_completed_analysis_survives_a_cache_write_failure(fake_st, monkeypatch):
+    recorded = []
+
+    def _boom(key, state):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(analysis, "load_from_cache", lambda key: None)
+    monkeypatch.setattr(analysis, "save_to_cache", _boom)
+    monkeypatch.setattr(analysis, "record_run", lambda key, state: recorded.append(key))
+
+    # Caching is an optimization; its failure must not sink a finished analysis.
+    result = analysis.run_analysis("Resume mentioning Python", "Role needs Python", [])
+
+    assert result is not None
+    assert result.get("match_report")
+    assert len(recorded) == 1
+    assert any("cache" in message.lower() for message in fake_st.warnings)

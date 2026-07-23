@@ -1480,3 +1480,33 @@ Mode: deterministic. Pass --live to call the real LLM.
 ```
 
 测试数从 183 增至 190。本条走确定性路径，无 API 调用，不产生费用。
+
+## Slice 11: 缓存写盘失败不再拖垮已完成的分析
+
+### 动机
+
+`run_analysis` 里 `save_to_cache(key, final_state)` 无容错。工作流已经跑完之后，
+若缓存写盘异常（磁盘满、权限、并发占用），异常会一路冒泡到 `app.py` 外层的
+`try/except`，UI 显示「Analysis failed」—— 而分析其实已经成功，结果（在 live 模式下
+甚至是花过钱得到的）被直接丢弃。相邻的 `save_run_history` 早已用 try/except 兜住，
+缓存却没有。缓存只是重复运行的加速手段，它的失败不应改变分析的成败。
+
+### 改动
+
+- `src/ui/analysis.py`：新增 `save_cache_safely`，与 `save_run_history` 对称，
+  把 `save_to_cache` 包进 try/except，失败时只 `st.warning` 而不中断返回。
+- `tests/test_analysis.py`：新增 `test_completed_analysis_survives_a_cache_write_failure`
+  —— 让 `save_to_cache` 抛 `OSError`，断言 `run_analysis` 仍返回带 match_report 的
+  结果、历史仍恰好记一次、并给出缓存告警。先写失败测试再实现（TDD）。
+
+### 验证
+
+```text
+$ pytest --basetemp=.pytest_tmp
+191 passed in 3.49s
+
+$ ruff check .
+All checks passed!
+```
+
+测试数从 190 增至 191。本条走确定性路径，无 API 调用，不产生费用。

@@ -16,6 +16,15 @@ def save_run_history(cache_key: str, state: dict) -> None:
         st.warning(f"Run history could not be saved: {exc}")
 
 
+def save_cache_safely(cache_key: str, state: dict) -> None:
+    # Caching only speeds up repeat runs; a write failure must not discard a
+    # finished (and possibly paid-for) analysis, so it is best-effort.
+    try:
+        save_to_cache(cache_key, state)
+    except Exception as exc:
+        st.warning(f"Result could not be cached: {exc}")
+
+
 def run_analysis(
     resume_text: str,
     jd_text: str,
@@ -44,6 +53,6 @@ def run_analysis(
                 st.write(f"{node_name}: {traces[-1] if traces else 'completed'}")
         status.update(label="Analysis complete", state="complete")
 
-    save_to_cache(key, final_state)
+    save_cache_safely(key, final_state)
     save_run_history(key, final_state)
     return final_state
