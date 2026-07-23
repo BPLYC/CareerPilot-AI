@@ -181,6 +181,8 @@ the measurements that contradicted the original plan.
 | 11 | Vectorstore gated off when embeddings are hash-based, which retrieved worse |
 | 12 | Screenshots refreshed; fixed the Compare Jobs sample loader they exposed |
 | 13 | Corrected the scoring claim with measurement; fixed a 0-1 scale drift |
+| 14 | Code-review fixes: latent chunking bug, honest RAG metric, weak tests |
+| 15 | Score alignment: show the AI score against the deterministic baseline |
 
 Slice 10 corrected a diagnosis made in the earlier slices. The RAG problem had
 been recorded as "the knowledge base is too small". The corpus size was a
@@ -302,10 +304,10 @@ Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 Known technical debt:
 
 - The LLM scores 15-20 points below the deterministic scorer on every sample
-  role, measured over four runs each (AI Intern 40-55 vs 68, Data Analyst 60-65
-  vs 79, SWE 50 vs 72). Run-to-run variation is small, so this is a systematic
-  offset rather than noise. Worth deciding whether to calibrate the prompt,
-  sanity-check against the deterministic score, or show both.
+  role (AI Intern 40-55 vs 68, Data Analyst 60-65 vs 79, SWE 50 vs 72). Handled
+  in slice 15: both scores are shown side by side and a warning fires past a
+  20-point gap; the model number is not rewritten. Calibrating the scoring
+  prompt to close the gap at the source remains open, if it is wanted.
 - Synonym-aware retrieval needs a real embedding model. The Chroma path does not
   provide it: with the default hash embeddings, synonym similarity measures
   0.000 and retrieval ranks worse than term overlap, so it is gated off.

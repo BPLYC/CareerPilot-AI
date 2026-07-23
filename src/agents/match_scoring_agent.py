@@ -47,6 +47,12 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
 
 LOW_MATCH_THRESHOLD = 45
 
+# How far the model score may sit from the deterministic baseline before the UI
+# warns. Measured on the sample data, the model runs 13-28 points below the
+# baseline, so 20 flags the wide cases (SWE 22, AI up to 28) while leaving the
+# routine offset (Data Analyst 14-19) to the quieter side-by-side display.
+SCORE_GAP_THRESHOLD = 20
+
 
 def _describe(report: dict) -> str:
     return (
@@ -55,20 +61,31 @@ def _describe(report: dict) -> str:
     )
 
 
-def _low_match_warnings(report: dict) -> dict:
-    if report["overall_score"] >= LOW_MATCH_THRESHOLD:
-        return {"warnings": []}
-    return {
-        "warnings": [
+def _score_warnings(report: dict, reference: int) -> list[str]:
+    warnings = []
+    if report["overall_score"] < LOW_MATCH_THRESHOLD:
+        warnings.append(
             f"Low match score ({report['overall_score']}/100). This JD may not be the best fit. "
             "Consider the suggestions in the report."
-        ]
-    }
+        )
+    gap = abs(report["overall_score"] - reference)
+    if gap >= SCORE_GAP_THRESHOLD:
+        warnings.append(
+            f"The AI score ({report['overall_score']}/100) and the rule-based score "
+            f"({reference}/100) disagree by {gap} points. Treat the number as approximate "
+            "and weigh the matched and missing skills, which are steadier."
+        )
+    return warnings
 
 
 def match_scoring_node(state) -> dict:
     resume_profile = state.get("resume_profile") or {}
     jd_analysis = state.get("jd_analysis") or {}
+
+    # Always computed, even on the LLM path, so the model's number can be shown
+    # against a stable baseline. On the fallback path the model IS this scorer,
+    # so the two agree and nothing extra surfaces.
+    reference = fallback_score_match(resume_profile, jd_analysis)["overall_score"]
 
     def from_llm() -> dict:
         user_prompt = (
@@ -92,5 +109,8 @@ def match_scoring_node(state) -> dict:
         fallback_branch=lambda: fallback_score_match(resume_profile, jd_analysis),
         describe=_describe,
         refine=lambda report: model_to_dict(validate_dict(MatchReport, report)),
-        extra_state=_low_match_warnings,
+        extra_state=lambda report: {
+            "reference_score": reference,
+            "warnings": _score_warnings(report, reference),
+        },
     )

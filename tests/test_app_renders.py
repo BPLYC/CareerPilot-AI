@@ -93,7 +93,31 @@ def test_download_button_appears_once_a_result_exists():
     assert "Download full report (Markdown)" in labels
 
     metrics = {element.label: element.value for element in app.metric}
+    # No API key in tests, so the model IS the reference scorer and the two
+    # agree, collapsing to the single-score layout.
     assert "Match Score" in metrics
+
+
+def test_diverging_scores_render_side_by_side():
+    """When the AI score and the baseline differ, both are shown, not one."""
+
+    app = AppTest.from_file("app.py", default_timeout=60)
+    app.session_state["last_result"] = {
+        "match_report": {
+            "overall_score": 45,
+            "matched_skills": ["Python"],
+            "missing_skills": ["Docker"],
+            "explanation": "x",
+        },
+        "reference_score": 72,
+        "warnings": [],
+    }
+    app.run()
+
+    assert not app.exception, [str(e) for e in app.exception]
+    labels = {element.label for element in app.metric}
+    assert {"AI Score", "Rule-based Score"} <= labels
+    assert "Match Score" not in labels
 
 
 def test_load_all_sample_jds_actually_fills_the_boxes():

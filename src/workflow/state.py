@@ -11,6 +11,11 @@ class CareerPilotState(TypedDict):
     jd_analysis: dict | None
     retrieved_context: dict
     match_report: dict | None
+    # The deterministic scorer's number, kept alongside the model's even on the
+    # LLM path. The model scores well below the rule-based baseline, and the
+    # user reads the model score as the headline, so the baseline is carried
+    # through for comparison rather than discarded.
+    reference_score: int | None
     optimized_bullets: list[dict]
     has_exaggeration: bool
     reflection_feedback: str
@@ -35,6 +40,7 @@ def create_initial_state(
         "jd_analysis": None,
         "retrieved_context": {},
         "match_report": None,
+        "reference_score": None,
         "optimized_bullets": [],
         "has_exaggeration": False,
         "reflection_feedback": "",

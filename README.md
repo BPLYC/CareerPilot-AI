@@ -171,14 +171,13 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Limitations
 
-- The LLM scores lower than the deterministic scorer, consistently. Measured over four runs per role on the bundled samples: AI Intern 40-55 against 68, Data Analyst 60-65 against 79, SWE Intern 50 every time against 72. Run-to-run variation is small (0-15 points); the gap between the two scorers is the systematic part. Read the score as a rough signal and rely on the matched and missing skills, which are stable.
+- The LLM scores lower than the deterministic scorer, consistently. Measured over four runs per role on the bundled samples: AI Intern 40-55 against 68, Data Analyst 60-65 against 79, SWE Intern 50 every time against 72. Run-to-run variation is small (0-15 points); the gap between the two scorers is the systematic part. The app handles this rather than hiding it: both scores are shown side by side when they differ, and a warning fires when they disagree by 20 points or more. The model's number is never silently rewritten. Still, read the score as a rough signal and rely on the matched and missing skills, which are stable.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.
 
 ## Future Work
 
-- Decide how to handle the systematic gap between the LLM score and the deterministic score: calibrate the prompt, sanity-check one against the other, or show both.
 - Optional demo GIF.
 - Synonym-aware retrieval needs a real embedding model. DeepSeek exposes no embeddings endpoint, so this requires either an OpenAI key (`EMBEDDING_PROVIDER=openai`, which enables the Chroma path automatically) or a local sentence-transformer.
 

@@ -1364,3 +1364,77 @@ $ python eval/run_eval.py   （连续两次）
 ```
 
 测试数从 166 增至 174。本条无 API 调用，不产生费用。
+
+## Slice 15: 打分对齐 —— 把 AI 分数与确定性基准并列
+
+这是仓库所有者选定的下一步，也是唯一带产品判断的一项。她入睡前授权我自行选择方案。
+
+### 背景
+
+slice 13 测出 LLM 打分系统性地低于确定性算法 15-20 分，且偶发极端离群（3 分）。
+用户在界面上看到的是 LLM 分数这个头号数字，因此它不可靠。三种可选方案：校准
+prompt、用确定性分数做钳制、或并列展示两者。
+
+### 选择的方案与理由
+
+**并列展示，不偷改分数。** 具体：
+
+- `match_scoring_node` 在 LLM 路径下**也总是**计算一次确定性分数，存为 state 顶层的
+  `reference_score`。fallback 路径下模型本身就是这个打分器，两者相等，不产生任何额外
+  显示。
+- 两分数差距 ≥ `SCORE_GAP_THRESHOLD`（20）时加一条 warning。阈值取 20 的依据是实测
+  差距 13-28：20 能捕捉大分歧（SWE 22、AI 极端 28），而让常规偏移（Data Analyst
+  14-19）留给更安静的并列展示处理。
+- UI 在两分数不同时并列显示「AI Score」与「Rule-based Score」两个 metric，附一句中性
+  说明；相同时退回单分数布局。Markdown 导出同理。
+
+不选钳制的理由：把 LLM 分数悄悄拉向基准，会让「模型打分不可靠」这个事实从视野里消失
+—— 这正是本轮反复出现的那类隐藏问题（HTTP 200、恒定指标、CI 从未验证）。**模型的
+原始分数在任何情况下都不被覆盖**，这是本方案的核心。
+
+不选校准 prompt 的理由：需要反复真实调用去试，烧预算，且结果仍会漂移。留作 Future
+Work。
+
+### 真实验证碰巧证明了它的价值
+
+真实 DeepSeek 端到端运行（预算闸退出码 0，余额 5.58 元）恰好又抽到了那个罕见的 3 分
+离群值：
+
+```text
+AI score:        3
+reference_score: 79
+gap:             76
+errors:          0
+warnings:
+  - Low match score (3/100). This JD may not be the best fit. ...
+  - The AI score (3/100) and the rule-based score (79/100) disagree by 76 points.
+    Treat the number as approximate and weigh the matched and missing skills, ...
+```
+
+模型给出 3 分时：它的原始分数 **3 被完整保留**（没有被改成 79），旁边并列着 79 分基准，
+并弹出「相差 76 分，请把分数当作近似值」的警告。功能正好在它该起作用的极端场景里
+起了作用。3 分离群值罕见但真实（本轮第二次遇到），这正是把基准并列展示、而非信任
+单一分数的理由。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+183 passed in 3.40s
+
+$ python eval/run_eval.py
+（评估输出无变化：确定性路径下 reference_score == overall_score，不影响任何指标列）
+```
+
+测试数从 174 增至 183。新增覆盖：gap warning 的触发/不触发/对称性、低分警告独立于
+gap、**模型分数被保留而非被基准覆盖**（核心断言）、fallback 路径两分数相等、导出与 UI
+在分歧时的双分数呈现。
+
+一处旧测试的断言随之更新：`test_match_scoring_uses_the_model_response` 原先断言
+`warnings == []`，但它的 fixture 让确定性基准远低于 fake 的 88 分，如今会触发 gap
+warning —— 这是正确的新行为，断言改为「不含低分警告」。
+
+本条产生少量 API 消耗（一次真实端到端验证）。

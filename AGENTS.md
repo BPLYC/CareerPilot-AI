@@ -43,6 +43,10 @@ Read these files first:
   50 vs 72). Run-to-run variation is only 0-15 points, so a single differing run
   is usually the offset rather than a regression. Do not freeze a live score
   into a screenshot; the capture tool defaults to the deterministic path.
+  match_scoring_node keeps the deterministic score as `reference_score` on the
+  LLM path and warns past SCORE_GAP_THRESHOLD; it never overwrites the model's
+  number. A live run has produced a score of 3 against a baseline of 79 -- rare,
+  but real, which is why the baseline is shown beside it.
 - **The Chroma vectorstore is not the better retrieval path by default.**
   `LocalHashEmbeddings` buckets tokens by md5 into 64 dimensions: synonym
   similarity is 0.000 and 839 tokens collide into those buckets 13-deep. Ranking
@@ -313,10 +317,7 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Decide how to handle the systematic gap between the LLM score and the
-   deterministic score: calibrate the prompt, sanity-check one against the
-   other, or show both. See the Limitations section of the README.
-2. Optionally add a short demo GIF if the README needs a walkthrough.
+1. Optionally add a short demo GIF if the README needs a walkthrough.
 3. Synonym-aware retrieval, if it is ever wanted, needs a real embedding model.
    Do not reach for the Chroma path expecting this: with the default
    `LocalHashEmbeddings` it is measurably worse than term overlap, which is why
