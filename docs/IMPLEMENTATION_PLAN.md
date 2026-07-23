@@ -179,6 +179,7 @@ the measurements that contradicted the original plan.
 | 9 | Multi-JD comparison |
 | 10 | RAG retrieval made selective (added after the first nine merged) |
 | 11 | Vectorstore gated off when embeddings are hash-based, which retrieved worse |
+| 12 | Screenshots refreshed; fixed the Compare Jobs sample loader they exposed |
 
 Slice 10 corrected a diagnosis made in the earlier slices. The RAG problem had
 been recorded as "the knowledge base is too small". The corpus size was a
@@ -299,7 +300,10 @@ Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 
 Known technical debt:
 
-- README screenshots predate the Compare Jobs tab and the export button.
+- The LLM match score is unstable: 65, 62, 40, and 3 across runs with identical
+  input, against a stable 68 from the deterministic scorer. The headline number
+  the user sees is therefore unreliable. Worth deciding whether to sanity-check
+  the model score against the deterministic one, or surface the disagreement.
 - Synonym-aware retrieval needs a real embedding model. The Chroma path does not
   provide it: with the default hash embeddings, synonym similarity measures
   0.000 and retrieval ranks worse than term overlap, so it is gated off.

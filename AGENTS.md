@@ -32,6 +32,15 @@ Read these files first:
 - **`tests/conftest.py` clears the API key for every test.** A test meaning to
   exercise the LLM branch must patch `src.agents.common.can_use_llm`, or it will
   pass while testing the fallback instead.
+- **A Streamlit widget with a `key` ignores `value=` after its first render.**
+  Seed `st.session_state[key]` and write through it instead, and assign before
+  the widget is created in that run. Passing both silently broke the Compare
+  Jobs sample loader for an entire slice, and unit tests over the underlying
+  function did not notice. Drive the UI with `AppTest` when a button is meant
+  to change what a widget shows.
+- **The LLM match score swings widely on identical input** (observed 3 to 65 for
+  the sample data, against a stable 68 from the deterministic scorer). Do not
+  read a single run as a regression, and do not freeze one into a screenshot.
 - **The Chroma vectorstore is not the better retrieval path by default.**
   `LocalHashEmbeddings` buckets tokens by md5 into 64 dimensions: synonym
   similarity is 0.000 and 839 tokens collide into those buckets 13-deep. Ranking

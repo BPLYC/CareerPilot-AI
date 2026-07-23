@@ -96,6 +96,47 @@ def test_download_button_appears_once_a_result_exists():
     assert "Match Score" in metrics
 
 
+def test_load_all_sample_jds_actually_fills_the_boxes():
+    """A keyed widget ignores `value=` after its first render.
+
+    The Compare Jobs tab originally passed `value=` alongside `key=`, so both
+    boxes stayed empty however often the button was pressed and the tab could
+    only ever report "Please provide a resume." The unit tests covered
+    compare_jobs() directly and never touched this path.
+    """
+
+    from src.ui.tabs.compare_tab import JD_KEY, RESUME_KEY
+
+    app = AppTest.from_file("app.py", default_timeout=60)
+    app.run()
+
+    button = next(b for b in app.button if b.label == "Load all sample JDs")
+    button.click().run()
+
+    assert not app.exception, [str(e) for e in app.exception]
+    assert "Alex Chen" in app.session_state[RESUME_KEY]
+    jd_text = app.session_state[JD_KEY]
+    assert "AI Intern" in jd_text
+    assert jd_text.count("===") >= 2, "every sample JD should be present"
+
+
+def test_comparison_runs_end_to_end_in_the_ui():
+    from eval.run_eval import use_deterministic_agents
+
+    use_deterministic_agents()
+
+    app = AppTest.from_file("app.py", default_timeout=120)
+    app.run()
+    next(b for b in app.button if b.label == "Load all sample JDs").click().run()
+    next(b for b in app.button if b.label == "Compare roles").click().run()
+
+    assert not app.exception, [str(e) for e in app.exception]
+    result = app.session_state["comparison_result"]
+    assert result.best is not None
+    assert len(result.jobs) == 3
+    assert all(not job.failed for job in result.jobs)
+
+
 def test_sensitive_reminder_is_not_shown_before_any_analysis():
     """It used to render unconditionally, warning about content not on screen."""
 

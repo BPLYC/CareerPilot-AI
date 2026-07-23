@@ -1087,3 +1087,99 @@ DeepSeek 未提供 embedding 接口，因此在当前 provider 下无法实现�
 
 本条无 API 调用，不产生费用。
 
+## Slice 12: 截图更新，以及它暴露的一个功能缺陷
+
+### 「Load all sample JDs」此前完全不工作
+
+刷新 README 截图时，为拍到 Compare Jobs 的结果页而驱动 UI，脚本一直超时。抓取失败
+时刻的截图后看到：两个输入框都是空的，页面显示「Please provide a resume.」——
+点击「Load all sample JDs」没有任何效果。
+
+原因是 Streamlit 的 widget 语义。带 `key=` 的组件，其值保存在
+`st.session_state[key]` 中，**首次渲染之后的每次 rerun 都会忽略 `value=` 参数**。
+`compare_tab.py` 同时使用了两者：
+
+```python
+jd_blocks = st.text_area("Job descriptions", value=st.session_state.get("compare_jds", ""), key="compare_jd_text")
+```
+
+首次渲染时 `compare_jd_text` 被注册为空字符串，此后按钮写入 `compare_jds` 完全
+不起作用。也就是说 slice 9 交付的这个功能，在真实 UI 中从一开始就是坏的 ——
+用户只能手动粘贴 JD，示例加载按钮是死的。
+
+**为什么此前的测试没有发现**：`tests/test_multi_jd.py` 直接测试 `compare_jobs()`
+纯函数；`tests/test_app_renders.py` 只断言控件存在。两者都没有真正驱动这条交互
+路径。
+
+### 改动
+
+- `compare_tab.py` 改为通过 `st.session_state` 传值，不再传 `value=`。加载按钮
+  移到 columns 之上 —— 组件创建之后就不能再赋值它的 session_state key。按钮写入
+  后调用 `st.rerun()`。
+- 新增两条 AppTest 回归测试：点击按钮后两个输入框确实被填充；以及完整的端到端
+  对比流程可以跑通并产出结果。把 `compare_tab.py` 临时 stash 回旧版本后，这两条
+  测试都失败，确认它们捕捉的是真实行为。
+
+### 截图工具的三处修复
+
+- **虚拟环境发现**：工具硬编码 `.venv` 在仓库根目录，在 git worktree 中不存在，
+  直接以 ENOENT 失败。现在会向上层查找，并支持 `PYTHON` 覆盖。
+- **点击方式**：`element.click()` 对 Streamlit 的主按钮无效 —— React 处理器绑定在
+  指针事件上。脚本会以为已经启动了分析，实际什么都没发生。改为通过
+  `Input.dispatchMouseEvent` 在元素中心派发真实鼠标事件。
+- **等待条件**：`run_analysis()` 命中缓存时会在创建 status 组件之前返回，因此
+  「Analysis complete」永远不出现，任何重复运行都会挂起。现在同时接受
+  「Loaded cached analysis」。
+
+### 截图改为确定性模式
+
+截图是提交进仓库的产物，应当可复现。工具现在默认清空 LLM 凭据与缓存后再运行，
+`--live` 才使用真实模型。
+
+这个决定另有一个具体原因。第一次带真实 API 的截图拍到了 **3/100** 的匹配分，而
+模型自己的解释写的是「strong alignment with Python, SQL, scikit-learn」。排查确认
+不是解析缺陷 —— 原始响应中的 `overall_score` 字段就是那个值，validated 之后一致。
+
+同一份简历与 JD，多次运行的 LLM 打分：
+
+| 运行 | LLM 打分 | 确定性打分 |
+| --- | --- | --- |
+| slice 3 验证 | 65 | 68 |
+| slice 4 验证 | 62 | 68 |
+| 截图首次 | 3 | 68 |
+| 诊断复现 | 40 | 68 |
+
+**用户在界面上看到的头号数字，在相同输入下从 3 摆动到 65。** 确定性算法稳定在 68。
+把其中任意一次冻结进 README 都是运气问题，因此截图使用确定性路径。
+
+这项分数不稳定本身是产品级问题，不在本条改动范围内 —— 记入 README 的已知限制，
+供仓库所有者判断是否需要处理（例如用确定性分数做合理性校验，或在两者差距过大时
+给出提示）。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+157 passed in 3.81s
+
+$ python eval/run_eval.py
+(评估输出无变化)
+
+$ node tools/capture_streamlit_screenshot.mjs
+Mode: deterministic (pass --live for real calls)
+Saved docs/assets/careerpilot-home.png
+Saved docs/assets/careerpilot-sample-input.png
+Saved docs/assets/careerpilot-match-report.png
+Saved docs/assets/careerpilot-compare-jobs.png
+```
+
+四张截图均已逐一目视检查：首页显示全部 7 个 tab；Match Report 显示导出按钮；
+Compare Jobs 显示排序表格与「Best fit: Data Analyst (79/100)」。新增的两张结果
+截图填补了 README 此前没有任何实际输出图片的空白。
+
+本条产生少量 API 消耗：截图首次运行走的是真实路径，另有一次用于诊断 3/100 的调用。
+余额从 5.63 元降至 5.62 元附近（结算有延迟）。
+

@@ -113,19 +113,29 @@ python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 
 ## Demo Screenshots
 
-Input screen with local DeepSeek configuration and Phase 2 tabs:
+Input screen with the provider settings and all seven tabs:
 
 ![CareerPilot AI input screen](docs/assets/careerpilot-home.png)
 
-Sample resume and AI Intern job description loaded through the Streamlit sidebar:
+Sample resume and AI Intern job description loaded through the sidebar:
 
 ![CareerPilot AI sample data loaded](docs/assets/careerpilot-sample-input.png)
 
-To refresh these screenshots after UI changes, use Node.js and local Google Chrome:
+Match report, with the Markdown export button:
+
+![CareerPilot AI match report](docs/assets/careerpilot-match-report.png)
+
+One resume compared against three roles, ranked by fit:
+
+![CareerPilot AI job comparison](docs/assets/careerpilot-compare-jobs.png)
+
+These are captured on the deterministic path, so anyone can regenerate the identical images and no API credit is spent. That is why the sidebar shows the fallback notice rather than a configured key.
 
 ```powershell
 node tools\capture_streamlit_screenshot.mjs
 ```
+
+Add `--live` to capture real model output instead. Note that the live match score is not stable: the sample resume and AI Intern JD have scored anywhere from 3 to 65 across runs, so a live capture freezes one draw from that spread.
 
 ## Tests And Linting
 
@@ -161,6 +171,7 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Limitations
 
+- The LLM-produced match score is not stable. The bundled sample resume and AI Intern JD have scored 65, 62, 40, and 3 across separate runs with identical input, while the deterministic scorer returns 68 every time. Treat the score as a rough signal, and read the matched and missing skills, which vary far less.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.
