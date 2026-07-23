@@ -26,8 +26,9 @@ def run_analysis(
     key = get_cache_key(resume_text, jd_text, application_questions)
     cached = load_from_cache(key)
     if cached:
+        # A cache hit re-displays an earlier analysis; it is not a new run, so
+        # history is left untouched to avoid duplicate rows for one analysis.
         st.info("Loaded cached analysis for the same resume and JD.")
-        save_run_history(key, cached)
         return cached
 
     state = create_initial_state(resume_text, jd_text, application_questions)

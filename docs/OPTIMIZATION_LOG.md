@@ -1438,3 +1438,45 @@ gap、**模型分数被保留而非被基准覆盖**（核心断言）、fallbac
 warning —— 这是正确的新行为，断言改为「不含低分警告」。
 
 本条产生少量 API 消耗（一次真实端到端验证）。
+
+## Slice 10: 修复缓存的隐私与历史重复缺陷
+
+### 动机
+
+2026-07-24 复审时发现两个残留缺陷，均不在原设计 spec 的 P1–P7 范围内：
+
+1. **缓存把简历/JD 原文明文写盘。** `src/services/cache.py` 的 `save_to_cache`
+   直接 `json.dump` 整个 workflow state，其中含 `raw_resume_text` 与
+   `raw_jd_text`。这与 README、`docs/PROJECT_SPEC.md` 反复声明的
+   「Uploaded files are processed in memory and are not saved / raw resumes and
+   job descriptions are not persisted」直接矛盾。`run_history` 已小心只存摘要，
+   缓存却把原文落到 `outputs/cache/*.json`。
+2. **缓存命中重复写历史。** `src/ui/analysis.py` 的 `run_analysis` 在缓存命中
+   分支仍调用 `save_run_history`。每次对同一输入点一次「Run」都会往 SQLite
+   插一条新记录，历史被重复行灌满，而重看缓存并不是一次新的分析。
+
+### 改动
+
+- `src/services/cache.py`：新增 `_SENSITIVE_KEYS`/`_redact_sensitive`，在写盘前
+  把 `raw_resume_text`、`raw_jd_text` 置空。这两个字段是输入，从不用于渲染缓存
+  结果，redact 后 UI 各 tab 仍完整（match_report、optimized_bullets 等均保留）。
+  redact 作用于副本，不改调用方内存中的 state。
+- `src/ui/analysis.py`：缓存命中分支移除 `save_run_history` 调用，只做展示。
+- 新增 `tests/test_cache.py`（5 例）与 `tests/test_analysis.py`（2 例），均先写
+  失败测试再实现（TDD）。
+
+### 验证
+
+```text
+$ pytest --basetemp=.pytest_tmp
+190 passed in 3.34s
+
+$ ruff check .
+All checks passed!
+
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+（两个 CSV 重新生成，git status 无变化 —— 指标零回退）
+```
+
+测试数从 183 增至 190。本条走确定性路径，无 API 调用，不产生费用。
