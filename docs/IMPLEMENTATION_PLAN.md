@@ -177,6 +177,19 @@ the measurements that contradicted the original plan.
 | 7 | `app.py` split into `src/ui/`; provider overrides scoped to a run |
 | 8 | Markdown report export |
 | 9 | Multi-JD comparison |
+| 10 | RAG retrieval made selective (added after the first nine merged) |
+| 11 | Vectorstore gated off when embeddings are hash-based, which retrieved worse |
+| 12 | Screenshots refreshed; fixed the Compare Jobs sample loader they exposed |
+| 13 | Corrected the scoring claim with measurement; fixed a 0-1 scale drift |
+
+Slice 10 corrected a diagnosis made in the earlier slices. The RAG problem had
+been recorded as "the knowledge base is too small". The corpus size was a
+symptom: `split_markdown()` accumulated paragraphs to 1200 characters ignoring
+markdown headings, so Machine Learning, Data Analysis, and Software Engineering
+bullets shared one chunk and no query could separate them, while `category`
+recorded only the last heading absorbed. Chunking per section, growing the
+content, and weighting heading matches made retrieval selective; a new
+`rag_corpus_fraction` metric measures that, because a snippet count cannot.
 
 Defects found and fixed along the way:
 
@@ -288,10 +301,14 @@ Phase 2 follow-up (all closed in the 2026-07-23 optimization round):
 
 Known technical debt:
 
-- The RAG knowledge base holds 8 chunks while `retrieve_context()` requests 16,
-  so retrieval always returns everything and the `rag_snippet_count` metric does
-  not measure retrieval quality. This is content work, not code.
-- README screenshots predate the Compare Jobs tab and the export button.
+- The LLM scores 15-20 points below the deterministic scorer on every sample
+  role, measured over four runs each (AI Intern 40-55 vs 68, Data Analyst 60-65
+  vs 79, SWE 50 vs 72). Run-to-run variation is small, so this is a systematic
+  offset rather than noise. Worth deciding whether to calibrate the prompt,
+  sanity-check against the deterministic score, or show both.
+- Synonym-aware retrieval needs a real embedding model. The Chroma path does not
+  provide it: with the default hash embeddings, synonym similarity measures
+  0.000 and retrieval ranks worse than term overlap, so it is gated off.
 - DeepSeek thinking mode with high reasoning effort is verified only for a direct
   smoke test; full multi-node workflow use should remain selective because it is
   slow. `DEEPSEEK_REQUEST_TIMEOUT` now exists for that case.

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -6,11 +7,40 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(scriptDir, "..");
-const python = process.env.PYTHON ?? resolve(repo, ".venv/Scripts/python.exe");
+
+// A git worktree has no .venv of its own, so look in the main checkout too
+// rather than failing with a bare ENOENT on a path that was never going to
+// exist. PYTHON overrides both.
+function findPython() {
+  if (process.env.PYTHON) return process.env.PYTHON;
+  const candidates = [
+    resolve(repo, ".venv/Scripts/python.exe"),
+    resolve(repo, ".venv/bin/python"),
+    resolve(repo, "../../../.venv/Scripts/python.exe"),
+    resolve(repo, "../../../.venv/bin/python"),
+  ];
+  const found = candidates.find((path) => existsSync(path));
+  if (found) return found;
+  throw new Error(
+    `No project virtual environment found. Looked in:\n  ${candidates.join("\n  ")}\n` +
+      "Set PYTHON to the interpreter that has streamlit installed."
+  );
+}
+
+const python = findPython();
 const chrome = process.env.CHROME_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const homeOut = resolve(repo, "docs/assets/careerpilot-home.png");
 const sampleOut = resolve(repo, "docs/assets/careerpilot-sample-input.png");
+const reportOut = resolve(repo, "docs/assets/careerpilot-match-report.png");
+const compareOut = resolve(repo, "docs/assets/careerpilot-compare-jobs.png");
 const chromeProfile = resolve(tmpdir(), "careerpilot-chrome-profile");
+
+// Screenshots are committed artifacts, so they default to the deterministic
+// path: regenerating them produces the same images and costs nothing. The model
+// also scores 15-20 points below the deterministic scorer, so a live capture is
+// both irreproducible and less representative.
+// Pass --live to capture real model output instead.
+const live = process.argv.includes("--live");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -92,6 +122,55 @@ async function waitForSampleData(cdp, timeoutMs = 30000) {
   throw new Error(`Timed out waiting for sample data. Last textarea value: ${lastValue.slice(0, 300)}`);
 }
 
+async function clickByText(cdp, selector, text) {
+  // Dispatch real mouse events at the element's centre rather than calling
+  // .click(). Streamlit's primary button ignores a programmatic click: the
+  // React handler is bound to pointer events, so the script would carry on
+  // believing it had started an analysis that never ran.
+  const box = await cdp("Runtime.evaluate", {
+    expression: `(() => {
+      const el = Array.from(document.querySelectorAll(${JSON.stringify(selector)}))
+        .find((node) => node.innerText.trim().includes(${JSON.stringify(text)}));
+      if (!el) return null;
+      el.scrollIntoView({ block: "center" });
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`,
+    returnByValue: true,
+  });
+  const point = box.result.value;
+  if (!point) throw new Error(`No ${selector} found matching "${text}"`);
+
+  for (const type of ["mousePressed", "mouseReleased"]) {
+    await cdp("Input.dispatchMouseEvent", {
+      type,
+      x: point.x,
+      y: point.y,
+      button: "left",
+      clickCount: 1,
+    });
+  }
+}
+
+async function waitForText(cdp, needles, timeoutMs = 180000) {
+  const wanted = Array.isArray(needles) ? needles : [needles];
+  const start = Date.now();
+  let lastText = "";
+  while (Date.now() - start < timeoutMs) {
+    const result = await cdp("Runtime.evaluate", {
+      expression: "document.body.innerText",
+      returnByValue: true,
+    });
+    lastText = result.result.value || "";
+    if (wanted.some((needle) => lastText.includes(needle))) return;
+    await sleep(1500);
+  }
+  if (process.env.DEBUG_CAPTURE) {
+    await captureViewport(cdp, resolve(tmpdir(), "careerpilot-capture-failure.png"));
+  }
+  throw new Error(`Timed out waiting for ${wanted.join(" or ")}. Last text: ${lastText.slice(0, 600)}`);
+}
+
 async function captureViewport(cdp, outputPath) {
   const shot = await cdp("Page.captureScreenshot", {
     format: "png",
@@ -115,6 +194,24 @@ async function cleanupChromeProfile() {
 await mkdir(resolve(repo, "docs/assets"), { recursive: true });
 await cleanupChromeProfile();
 
+if (!live) {
+  // Otherwise the screenshot shows whatever a previous run left cached,
+  // including output from a live run, and stops being reproducible.
+  await rm(resolve(repo, "outputs/cache"), { recursive: true, force: true });
+}
+
+const streamlitEnv = { ...process.env };
+if (!live) {
+  // Set to empty rather than deleted. provider_config calls load_dotenv() at
+  // import, which finds .env up the directory tree and would restore anything
+  // merely absent; load_dotenv does not override a variable that is already
+  // present, even when its value is empty.
+  streamlitEnv.DEEPSEEK_API_KEY = "";
+  streamlitEnv.DEEPSEEK_MODEL = "";
+  streamlitEnv.CAREERPILOT_DISABLE_VECTORSTORE = "1";
+}
+console.log(live ? "Mode: LIVE (real model calls)" : "Mode: deterministic (pass --live for real calls)");
+
 const streamlit = spawn(python, [
   "-m",
   "streamlit",
@@ -126,7 +223,7 @@ const streamlit = spawn(python, [
   "8501",
   "--server.headless",
   "true",
-], { cwd: repo, stdio: "inherit" });
+], { cwd: repo, stdio: "inherit", env: streamlitEnv });
 
 let browser;
 try {
@@ -155,11 +252,36 @@ try {
   });
   await waitForRenderedText(cdp);
   await captureViewport(cdp, homeOut);
-  await cdp("Runtime.evaluate", {
-    expression: "Array.from(document.querySelectorAll('button')).find((el) => el.innerText.includes('Load Sample Data'))?.click()",
-  });
+  await clickByText(cdp, "button", "Load Sample Data");
   await waitForSampleData(cdp);
   await captureViewport(cdp, sampleOut);
+
+  // Run one analysis so the result screenshots show real output, including the
+  // Markdown export button, which only exists once there is a report.
+  await clickByText(cdp, "button", "Run CareerPilot Analysis");
+  // run_analysis returns before creating the status widget when the result is
+  // cached, so waiting only for "Analysis complete" hangs on any repeat run.
+  await waitForText(cdp, ["Analysis complete", "Loaded cached analysis"]);
+  await clickByText(cdp, "button[role='tab']", "Match Report");
+  await waitForText(cdp, "Download full report");
+  await sleep(1500);
+  await captureViewport(cdp, reportOut);
+
+  // Each button click reruns the script and Streamlit returns to the first
+  // tab, so the tab has to be reselected after every interaction.
+  await clickByText(cdp, "button[role='tab']", "Compare Jobs");
+  await waitForText(cdp, "Compare one resume against several roles");
+  await clickByText(cdp, "button", "Load all sample JDs");
+  await sleep(3000);
+  await clickByText(cdp, "button[role='tab']", "Compare Jobs");
+  await sleep(1000);
+  await clickByText(cdp, "button", "Compare roles");
+  await sleep(3000);
+  await clickByText(cdp, "button[role='tab']", "Compare Jobs");
+  await waitForText(cdp, "Best fit:");
+  await sleep(1500);
+  await captureViewport(cdp, compareOut);
+
   ws.close();
 } finally {
   if (browser) browser.kill();

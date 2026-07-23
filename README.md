@@ -8,7 +8,7 @@ CareerPilot AI uses a real workflow rather than one long prompt:
 
 - Conditional routing sends low-fit jobs to a warning path and skips resume optimization.
 - A reflection node checks generated bullets for unsupported claims and can loop back to the optimizer.
-- A local RAG knowledge base supplies resume bullet templates, STAR examples, and skill taxonomy snippets.
+- A local RAG knowledge base supplies resume bullet templates, STAR examples, and skill taxonomy snippets, chunked per section so an AI role and a backend role retrieve different material.
 - Evaluation metrics make the output measurable.
 
 ## Problem Statement
@@ -36,7 +36,7 @@ Students applying for AI, data, and software internships need help understanding
 - LangGraph
 - Pydantic
 - DeepSeek OpenAI-compatible API
-- ChromaDB optional local vector store through `langchain-chroma`
+- ChromaDB optional local vector store through `langchain-chroma`, used when `EMBEDDING_PROVIDER=openai` supplies real embeddings; with the default hash embeddings the deterministic term-overlap retriever ranks better and is used instead
 
 ## Architecture Diagram
 
@@ -113,19 +113,29 @@ python -m streamlit run app.py --server.address 127.0.0.1 --server.port 8501
 
 ## Demo Screenshots
 
-Input screen with local DeepSeek configuration and Phase 2 tabs:
+Input screen with the provider settings and all seven tabs:
 
 ![CareerPilot AI input screen](docs/assets/careerpilot-home.png)
 
-Sample resume and AI Intern job description loaded through the Streamlit sidebar:
+Sample resume and AI Intern job description loaded through the sidebar:
 
 ![CareerPilot AI sample data loaded](docs/assets/careerpilot-sample-input.png)
 
-To refresh these screenshots after UI changes, use Node.js and local Google Chrome:
+Match report, with the Markdown export button:
+
+![CareerPilot AI match report](docs/assets/careerpilot-match-report.png)
+
+One resume compared against three roles, ranked by fit:
+
+![CareerPilot AI job comparison](docs/assets/careerpilot-compare-jobs.png)
+
+These are captured on the deterministic path, so anyone can regenerate the identical images and no API credit is spent. That is why the sidebar shows the fallback notice rather than a configured key.
 
 ```powershell
 node tools\capture_streamlit_screenshot.mjs
 ```
+
+Add `--live` to capture real model output instead. A live capture freezes one model run, and the model scores 15-20 points below the deterministic scorer (see Limitations), so the deterministic default is the more representative picture as well as the reproducible one.
 
 ## Tests And Linting
 
@@ -161,15 +171,16 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Limitations
 
+- The LLM scores lower than the deterministic scorer, consistently. Measured over four runs per role on the bundled samples: AI Intern 40-55 against 68, Data Analyst 60-65 against 79, SWE Intern 50 every time against 72. Run-to-run variation is small (0-15 points); the gap between the two scorers is the systematic part. Read the score as a rough signal and rely on the matched and missing skills, which are stable.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.
 
 ## Future Work
 
-- Grow the RAG knowledge base. It currently holds 8 chunks while retrieval requests 16, so every query returns everything and the `rag_snippet_count` metric does not measure retrieval quality.
-- Refresh the README screenshots, which predate the Compare Jobs tab and the report export button.
+- Decide how to handle the systematic gap between the LLM score and the deterministic score: calibrate the prompt, sanity-check one against the other, or show both.
 - Optional demo GIF.
+- Synonym-aware retrieval needs a real embedding model. DeepSeek exposes no embeddings endpoint, so this requires either an OpenAI key (`EMBEDDING_PROVIDER=openai`, which enables the Chroma path automatically) or a local sentence-transformer.
 
 ## Resume Bullet For This Project
 

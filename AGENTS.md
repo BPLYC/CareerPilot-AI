@@ -32,6 +32,23 @@ Read these files first:
 - **`tests/conftest.py` clears the API key for every test.** A test meaning to
   exercise the LLM branch must patch `src.agents.common.can_use_llm`, or it will
   pass while testing the fallback instead.
+- **A Streamlit widget with a `key` ignores `value=` after its first render.**
+  Seed `st.session_state[key]` and write through it instead, and assign before
+  the widget is created in that run. Passing both silently broke the Compare
+  Jobs sample loader for an entire slice, and unit tests over the underlying
+  function did not notice. Drive the UI with `AppTest` when a button is meant
+  to change what a widget shows.
+- **The LLM scores 15-20 points below the deterministic scorer**, consistently
+  across the sample roles (AI Intern 40-55 vs 68, Data Analyst 60-65 vs 79, SWE
+  50 vs 72). Run-to-run variation is only 0-15 points, so a single differing run
+  is usually the offset rather than a regression. Do not freeze a live score
+  into a screenshot; the capture tool defaults to the deterministic path.
+- **The Chroma vectorstore is not the better retrieval path by default.**
+  `LocalHashEmbeddings` buckets tokens by md5 into 64 dimensions: synonym
+  similarity is 0.000 and 839 tokens collide into those buckets 13-deep. Ranking
+  by term overlap beats it, so `has_semantic_embeddings()` skips the vectorstore
+  unless real embeddings are configured. Enabling Chroma is not an optimisation
+  here — measure before assuming otherwise.
 
 ## Current Status
 
@@ -235,6 +252,14 @@ try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8501 -TimeoutSec 5 | S
 
 ## Architecture Notes
 
+Knowledge files are chunked **one chunk per markdown section**, and
+`chunk.metadata["category"]` comes from that section's own heading. Retrieval
+weights heading matches `HEADING_WEIGHT` times body matches, so headings are
+load-bearing: adding content under an existing heading extends that topic, while
+a new `#` heading creates a separately retrievable unit. `tests/test_rag_retrieval.py`
+asserts each collection holds more chunks than the retriever requests; if you add
+a collection, keep that true or retrieval has nothing to choose between.
+
 `careerpilot_graph.py` holds two engines. `stream_workflow()` prefers the
 compiled LangGraph and falls back to the sequential runner when langgraph is not
 installed. `tests/test_workflow_parity.py` pins them to the same results; if you
@@ -288,9 +313,12 @@ Use non-thinking mode and low reasoning effort for faster local demos unless the
 
 ## Near-Term Next Work
 
-1. Grow the RAG knowledge base. It holds 8 chunks while `retrieve_context()`
-   requests 16, so retrieval always returns everything and the
-   `rag_snippet_count` comparison metric is not measuring retrieval quality.
-2. Regenerate the README screenshots; they predate the Compare Jobs tab and the
-   report export button.
-3. Optionally add a short demo GIF if the README needs a walkthrough.
+1. Decide how to handle the systematic gap between the LLM score and the
+   deterministic score: calibrate the prompt, sanity-check one against the
+   other, or show both. See the Limitations section of the README.
+2. Optionally add a short demo GIF if the README needs a walkthrough.
+3. Synonym-aware retrieval, if it is ever wanted, needs a real embedding model.
+   Do not reach for the Chroma path expecting this: with the default
+   `LocalHashEmbeddings` it is measurably worse than term overlap, which is why
+   `has_semantic_embeddings()` now gates it. It requires `EMBEDDING_PROVIDER=openai`
+   or a local sentence-transformer; DeepSeek has no embeddings endpoint.

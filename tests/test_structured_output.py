@@ -1,3 +1,5 @@
+import pytest
+
 from src.models.schemas import BulletSuggestion, JobDescriptionAnalysis, MatchReport, ResumeProfile
 from src.services.structured_output import model_to_dict, validate_dict
 
@@ -116,3 +118,41 @@ def test_match_report_accepts_relevant_project_objects():
     assert data["matched_skills"] == ["Python", "SQL"]
     assert data["relevant_projects"] == ["Movie Recommendation System", "Sales Data Dashboard"]
     assert data["weak_sections"] == ["Skill gaps"]
+
+
+def _report_with_score(score):
+    return model_to_dict(
+        validate_dict(
+            MatchReport,
+            {
+                "overall_score": score,
+                "matched_skills": ["Python"],
+                "missing_skills": [],
+                "relevant_projects": [],
+                "weak_sections": [],
+                "explanation": "x",
+            },
+        )
+    )["overall_score"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Observed from the real model: 0.4 meaning 40 percent. Pydantic
+        # rejected the float outright, so the node threw away the model's answer
+        # and fell back, turning a score into a failure.
+        (0.4, 40),
+        (0.75, 75),
+        (0.03, 3),
+        ("62", 62),
+        ("58%", 58),
+        (72.6, 73),
+        (65, 65),
+        # Ambiguous, and both are valid 0-100 scores, so they are left alone.
+        (0, 0),
+        (1, 1),
+    ],
+)
+def test_overall_score_is_normalised_onto_the_0_100_scale(raw, expected):
+    assert _report_with_score(raw) == expected

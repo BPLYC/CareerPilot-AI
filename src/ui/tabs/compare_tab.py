@@ -39,6 +39,10 @@ def _load_all_samples() -> str:
     return f"\n{JD_SEPARATOR}\n".join(parts)
 
 
+RESUME_KEY = "compare_resume_text"
+JD_KEY = "compare_jd_text"
+
+
 def render(settings) -> None:
     st.markdown("#### Compare one resume against several roles")
     st.caption(
@@ -46,28 +50,28 @@ def render(settings) -> None:
         "Start a block with '# Label' to name it."
     )
 
+    # A keyed widget takes its value from session_state and ignores `value=` on
+    # every rerun after the first, so the contents have to be seeded here and
+    # written through session_state. Passing `value=` instead left both boxes
+    # permanently empty and made "Load all sample JDs" do nothing.
+    st.session_state.setdefault(RESUME_KEY, st.session_state.get("sample_resume", ""))
+    st.session_state.setdefault(JD_KEY, "")
+
+    # Above the columns: session_state for a widget key cannot be assigned once
+    # that widget has been created in the same run.
+    if st.button("Load all sample JDs", use_container_width=True):
+        st.session_state[RESUME_KEY] = load_sample(next(iter(SAMPLE_JDS)))[0]
+        st.session_state[JD_KEY] = _load_all_samples()
+        st.rerun()
+
     col1, col2 = st.columns(2)
     with col1:
         resume_file = st.file_uploader(
             "Upload Resume (TXT, PDF, or DOCX)", type=["txt", "pdf", "docx"], key="compare_resume_upload"
         )
-        pasted_resume = st.text_area(
-            "Or paste resume text here",
-            height=300,
-            value=st.session_state.get("sample_resume", ""),
-            key="compare_resume_text",
-        )
+        pasted_resume = st.text_area("Or paste resume text here", height=300, key=RESUME_KEY)
     with col2:
-        if st.button("Load all sample JDs", use_container_width=True):
-            st.session_state["compare_jds"] = _load_all_samples()
-            resume, _ = load_sample(next(iter(SAMPLE_JDS)))
-            st.session_state["sample_resume"] = resume
-        jd_blocks = st.text_area(
-            "Job descriptions",
-            height=340,
-            value=st.session_state.get("compare_jds", ""),
-            key="compare_jd_text",
-        )
+        jd_blocks = st.text_area("Job descriptions", height=340, key=JD_KEY)
 
     if st.button("Compare roles", type="primary", use_container_width=True):
         _run_comparison(resume_file, pasted_resume, jd_blocks, settings)

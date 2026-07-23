@@ -844,3 +844,523 @@ AI Intern:    missing = ['PyTorch', 'TensorFlow', 'NLP']
 
 本 slice 无 API 调用，不产生费用。
 
+## Slice 10: RAG 检索恢复选择性
+
+本条在前九个 slice 合并到 `integration/2026-07-optimization` 之后追加，处理此前
+被记为「超出范围」的那个问题。
+
+### 诊断修正了此前的判断
+
+前面几个 slice 把这个问题记录为「知识库只有 8 个 chunk，太小」。实际排查后发现，
+**语料规模只是表象，分块逻辑本身是坏的**。
+
+`split_markdown()` 按 1200 字符累积段落，完全不理会 markdown 标题。旧行为实测：
+
+```text
+total chunks: 8
+[resume_bullets] 914 chars | category=software_engineering
+                 | headings inside: ['# Machine Learning', '# Data Analysis', '# Software Engineering']
+[skill_taxonomy] 1112 chars | category=databases
+                 | headings inside: ['# Programming Languages', '# ML And AI', '# Data Tools',
+                                     '# Visualization', '# Cloud And DevOps', '# Software Engineering',
+                                     '# Databases']
+[skill_taxonomy]  160 chars | category=databases | headings inside: []
+```
+
+三个后果：
+
+1. **AI 岗和 SWE 岗的查询在原理上无法区分。** Machine Learning、Data Analysis、
+   Software Engineering 三节的 bullet 模板挤在同一个 chunk 里，无论查询是什么，
+   要么全拿到要么全拿不到。
+2. **`category` 元数据是错的。** 它只记录该 chunk 吸收的最后一个标题，因此上面
+   那个含三节内容的 chunk 被标为 `software_engineering`，描述错了自己三分之二的
+   内容。
+3. **存在孤儿 chunk。** 160 字符那一块没有任何标题，category 从上一块泄漏而来。
+
+所以只补内容而不修分块是无效的 —— 新内容同样会被揉进跨节的大块里。
+
+### 改动
+
+**分块按节切分。** `split_markdown()` 改为每个 markdown 标题起一个新 chunk，
+category 取自该 chunk 自己的标题。超过 `chunk_size` 的长节仍会继续切分，但每一片
+都重复标题，保证自描述。
+
+仅此一项改动：8 → 23 个 chunk，每个恰好一个标题，category 全部正确，孤儿块消失。
+
+**扩充知识库内容。** 新增的节是实习准备的实际内容，不是填充：
+
+- `resume_bullet_templates.md`：Deep Learning、NLP、Data Engineering、
+  Backend And API、Testing And Quality。
+- `interview_question_bank.md`：ML 概念、数据分析概念、软件工程概念、SQL 与数据库、
+  反问面试官的问题。
+- `star_method_examples.md`：学习新工具、需求不明、时间压力、API 集成、数据质量问题。
+- `application_question_examples.md`：项目举例、为何选择该公司、学习与成长、团队协作、
+  应对挫折、日程与出勤安排。
+
+内容遵循项目既有约束：不编造事实，不替用户回答签证与薪酬类问题。
+
+23 → 44 个 chunk。各 collection 与检索请求量的对比：
+
+| collection | 请求 k | 改动前可用 | 改动后可用 |
+| --- | --- | --- | --- |
+| resume_bullets | 5 | 2 | 10 |
+| star_examples | 3 | 2 | 10 |
+| skill_taxonomy | 3 | 2 | 7 |
+| application_examples | 2 | 1 | 9 |
+| interview_bank | 3 | 1 | 8 |
+
+**评分函数利用标题。** 每个 chunk 现在恰好对应一节，标题比正文任何一行都更能说明
+这节讲什么 ——「Backend And API」与「Deep Learning」两节都会提到 Python，只有标题
+能区分。`_score()` 现在把 category 匹配按 3 倍权重计入。
+
+### 效果
+
+同一份简历对三个样例 JD 的检索结果（`bullet_templates` 一列）：
+
+```text
+AI Intern    -> ['Machine Learning', 'Data Analysis', 'Deep Learning',
+                 'Software Engineering', 'Natural Language Processing']
+Data Analyst -> ['Data Analysis', 'Data Engineering', 'Machine Learning',
+                 'Software Engineering', 'Deep Learning']
+SWE Intern   -> ['Software Engineering', 'Backend And API', 'Data Engineering',
+                 'Machine Learning', 'Data Analysis']
+```
+
+SWE 岗拿到 Backend And API、API Integration、Cloud And DevOps；AI 岗拿到 ML And AI、
+Model Training、Deep Learning；Data Analyst 拿到 Data Engineering、Data Tools、
+Data Quality Issue。改动前三者拿到的是**完全相同**的内容。
+
+标题加权带来的增量：AI 与 Data Analyst 的 bullet 模板重合度从 5/5 降至 4/5。
+剩余重合是合理的 —— 两个岗位都以 Python 和 SQL 为主。
+
+### 指标本身也需要修
+
+把 `rag_snippet_count` 从 8 提到 16 不能说明问题已解决：语料 44 条、请求 16 条，
+这个计数从此恒为 16，依旧不衡量任何东西。「返回 8 条中的 8 条」和「返回 800 条中的
+8 条」是同一个数字，却是完全不同的行为。
+
+因此新增了一个占比指标。**但这个替代指标当时也没有真正解决问题** —— 见 slice 14 的
+更正：它同样是常量，只是换了个数值。
+
+### 验证
+
+新增 `tests/test_rag_retrieval.py`（17 条）。为确认这些测试确实在验证行为而不是
+恒真，把源码与内容临时 stash 回旧版本后重跑：
+
+```text
+FAILED test_each_chunk_covers_exactly_one_section
+FAILED test_category_matches_the_heading_in_the_chunk
+FAILED test_sections_are_split_even_when_they_would_fit_one_chunk
+FAILED test_a_long_section_splits_but_keeps_its_heading
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[resume_bullets-5]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[star_examples-3]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[skill_taxonomy-3]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[application_examples-2]
+FAILED test_every_collection_offers_more_than_the_retriever_asks_for[interview_bank-3]
+FAILED test_different_roles_retrieve_different_context
+FAILED test_retrieval_reflects_the_role
+FAILED test_retrieval_does_not_return_the_whole_corpus
+FAILED test_heading_matches_outrank_incidental_body_mentions
+```
+
+13 条在旧实现下失败。其中 `test_different_roles_retrieve_different_context` 的失败
+直接证明了旧代码下三个岗位拿到的上下文完全一致。
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+149 passed in 2.75s
+
+$ python eval/run_eval.py   （连续两次）
+reproducible: True
+```
+
+测试数从 132 增至 149。评估输出发生变化是**预期的** —— 这正是检索行为改变的体现，
+且连续两次运行仍逐字节一致。
+
+本条无 API 调用，不产生费用。
+
+## Slice 11: 停止默认使用会降低质量的向量库路径
+
+### 我在 Future Work 里写错了一条
+
+Slice 10 结束时，我把剩余工作记为「检索用词项匹配，同义词会漏；走 Chroma 的
+embedding 路径可以解决」。着手前先做验证，**这条是错的**。
+
+`get_embeddings()` 默认返回 `LocalHashEmbeddings`（`EMBEDDING_PROVIDER=local_hash`，
+项目是 DeepSeek-only，没有配置 OpenAI embedding）。它把每个 token 用 md5 映射到
+64 个桶之一然后计数 —— 是哈希词袋，不是语义向量。实测：
+
+```text
+default embeddings: LocalHashEmbeddings | dims: 64
+
+cosine similarity under local_hash:
+  'pytorch'  vs 'deep learning framework'     = 0.000
+  'sql'      vs 'relational database queries' = 0.000
+  'rest api' vs 'http endpoint'               = 0.000
+  'pytorch'  vs 'pytorch'                     = 1.000
+```
+
+三组同义词相似度全为 0.000。**零同义词能力**，所以这条路径根本无法交付我承诺的
+效果。
+
+碰撞问题同样严重：
+
+```text
+vocabulary: 839 distinct tokens into 64 buckets
+average tokens per bucket: 13.1
+busiest bucket holds 20 tokens, e.g. ['applied', 'causation', 'confirmed',
+                                      'crud', 'debug', 'docker:', 'finding', 'hugging']
+```
+
+平均 13 个词共用一个维度，`docker` 与 `causation`、`hugging` 成为同一个特征。
+
+### 由此发现的真实缺陷
+
+既然哈希向量既无语义又高度碰撞，那么走 Chroma 的检索质量应当低于词项匹配。
+实测对比（重建向量库后，同一份知识库、同样三个样例 JD）：
+
+```text
+===== markdown scorer =====
+SWE Intern   bullets: ['Software Engineering', 'Backend And API', 'Data Engineering', ...]
+             skills : ['Software Engineering', 'Programming Languages', 'Cloud And DevOps']
+Data Analyst skills : ['Databases', 'Data Tools', 'Programming Languages']
+
+===== chroma + local_hash =====
+SWE Intern   bullets: ['Data Analysis', 'Backend And API', 'Machine Learning',
+                       'Deep Learning', 'Software Engineering']
+             skills : ['Visualization', 'Databases', 'Data Tools']
+Data Analyst skills : ['Visualization', 'Databases', 'Data Tools']
+```
+
+Chroma 路径下：
+
+- 后端岗位的首选 bullet 变成「Data Analysis」，「Software Engineering」跌到第 5 位。
+- 后端岗位的技能片段里既没有 Software Engineering 也没有 Cloud And DevOps，取而代之
+  的是 Visualization。
+- 数据分析岗与软件工程岗拿到**完全相同**的技能片段 —— 无法区分。
+
+而 `retrieve_snippets()` 是**优先**使用向量库的，只要 `data/vectorstore/` 存在即生效。
+该目录是 gitignore 的机器本地状态，运行过应用的机器上就会有。也就是说在实际使用中，
+检索走的是更差的那条路径 —— 这个缺陷此前一直存在，只是知识库过小时（每次返回全部
+内容）无从暴露。
+
+### 改动
+
+`get_or_build_vectorstore()` 现在在嵌入不具备语义时返回 `None`，即跳过向量库。
+新增 `has_semantic_embeddings()` 判断，逻辑与依据写在其 docstring 中。
+
+向量库路径本身保留：配置 `EMBEDDING_PROVIDER=openai` 后自动启用。也可用
+`CAREERPILOT_FORCE_VECTORSTORE=1` 强制启用哈希向量路径（用于演示或调试）。
+`CAREERPILOT_DISABLE_VECTORSTORE` 优先级高于强制开关。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+155 passed in 3.00s
+
+$ python eval/run_eval.py
+(评估输出无变化 —— 评估本就强制走 markdown 路径)
+```
+
+新增 6 条测试：哈希嵌入不被判定为语义嵌入、同义词相似度为 0、默认跳过向量库、
+强制开关有效、禁用优先于强制。
+
+需要说明的是：这不能算「解决了同义词问题」。同义词检索需要真正的嵌入模型，而
+DeepSeek 未提供 embedding 接口，因此在当前 provider 下无法实现。本条做的是**停止
+使用一个比现有方案更差的路径**，并把判断依据写进代码，避免下一个人重新踩进去。
+
+本条无 API 调用，不产生费用。
+
+## Slice 12: 截图更新，以及它暴露的一个功能缺陷
+
+### 「Load all sample JDs」此前完全不工作
+
+刷新 README 截图时，为拍到 Compare Jobs 的结果页而驱动 UI，脚本一直超时。抓取失败
+时刻的截图后看到：两个输入框都是空的，页面显示「Please provide a resume.」——
+点击「Load all sample JDs」没有任何效果。
+
+原因是 Streamlit 的 widget 语义。带 `key=` 的组件，其值保存在
+`st.session_state[key]` 中，**首次渲染之后的每次 rerun 都会忽略 `value=` 参数**。
+`compare_tab.py` 同时使用了两者：
+
+```python
+jd_blocks = st.text_area("Job descriptions", value=st.session_state.get("compare_jds", ""), key="compare_jd_text")
+```
+
+首次渲染时 `compare_jd_text` 被注册为空字符串，此后按钮写入 `compare_jds` 完全
+不起作用。也就是说 slice 9 交付的这个功能，在真实 UI 中从一开始就是坏的 ——
+用户只能手动粘贴 JD，示例加载按钮是死的。
+
+**为什么此前的测试没有发现**：`tests/test_multi_jd.py` 直接测试 `compare_jobs()`
+纯函数；`tests/test_app_renders.py` 只断言控件存在。两者都没有真正驱动这条交互
+路径。
+
+### 改动
+
+- `compare_tab.py` 改为通过 `st.session_state` 传值，不再传 `value=`。加载按钮
+  移到 columns 之上 —— 组件创建之后就不能再赋值它的 session_state key。按钮写入
+  后调用 `st.rerun()`。
+- 新增两条 AppTest 回归测试：点击按钮后两个输入框确实被填充；以及完整的端到端
+  对比流程可以跑通并产出结果。把 `compare_tab.py` 临时 stash 回旧版本后，这两条
+  测试都失败，确认它们捕捉的是真实行为。
+
+### 截图工具的三处修复
+
+- **虚拟环境发现**：工具硬编码 `.venv` 在仓库根目录，在 git worktree 中不存在，
+  直接以 ENOENT 失败。现在会向上层查找，并支持 `PYTHON` 覆盖。
+- **点击方式**：`element.click()` 对 Streamlit 的主按钮无效 —— React 处理器绑定在
+  指针事件上。脚本会以为已经启动了分析，实际什么都没发生。改为通过
+  `Input.dispatchMouseEvent` 在元素中心派发真实鼠标事件。
+- **等待条件**：`run_analysis()` 命中缓存时会在创建 status 组件之前返回，因此
+  「Analysis complete」永远不出现，任何重复运行都会挂起。现在同时接受
+  「Loaded cached analysis」。
+
+### 截图改为确定性模式
+
+截图是提交进仓库的产物，应当可复现。工具现在默认清空 LLM 凭据与缓存后再运行，
+`--live` 才使用真实模型。
+
+这个决定另有一个具体原因。第一次带真实 API 的截图拍到了 **3/100** 的匹配分，而
+模型自己的解释写的是「strong alignment with Python, SQL, scikit-learn」。排查确认
+不是解析缺陷 —— 原始响应中的 `overall_score` 字段就是那个值，validated 之后一致。
+
+当时记录为「相同输入下从 3 摆动到 65」。**这个结论后来被证明是错的**，更正见
+下一条。截图使用确定性路径的决定本身仍然成立。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+157 passed in 3.81s
+
+$ python eval/run_eval.py
+(评估输出无变化)
+
+$ node tools/capture_streamlit_screenshot.mjs
+Mode: deterministic (pass --live for real calls)
+Saved docs/assets/careerpilot-home.png
+Saved docs/assets/careerpilot-sample-input.png
+Saved docs/assets/careerpilot-match-report.png
+Saved docs/assets/careerpilot-compare-jobs.png
+```
+
+四张截图均已逐一目视检查：首页显示全部 7 个 tab；Match Report 显示导出按钮；
+Compare Jobs 显示排序表格与「Best fit: Data Analyst (79/100)」。新增的两张结果
+截图填补了 README 此前没有任何实际输出图片的空白。
+
+本条产生少量 API 消耗：截图首次运行走的是真实路径，另有一次用于诊断 3/100 的调用。
+余额从 5.63 元降至 5.62 元附近（结算有延迟）。
+
+## Slice 13: 更正打分结论，并修复量纲导致的静默失败
+
+仓库所有者质疑了 slice 12 的结论：3 分是不是因为样例数据本身不合适？这促成了一次
+正式测量，结果推翻了我此前的说法。
+
+### 此前的结论错在哪里
+
+slice 12 写的是「相同输入下从 3 摆动到 65」。这个说法有两个问题：
+
+1. **输入并不相同。** 65 和 62 是 slice 10 修改 RAG 之前测得的，3 和 40 是之后。
+   检索到的片段是打分节点的输入之一（`retrieved_context` 会进入 prompt），因此
+   这四个数字并非来自同一条件。我把一个可能的因果关系当成了随机性。
+2. **样本量为 1 的离群值被当成了范围端点。** 3 分只出现过一次。
+
+### 正式测量
+
+每个样例 JD 连续 4 次，代码状态一致：
+
+```text
+=== ai_intern ===
+deterministic score: 68
+LLM, with RAG context              [40, 50, 50, 55]  mean=48.8  spread=15
+LLM, no RAG context                [40, 40, 50, 40]  mean=42.5  spread=10
+
+=== data_analyst ===
+deterministic score: 79
+LLM, with RAG context              [65, 60, 60, 65]  mean=62.5  spread=5
+
+=== swe_intern ===
+deterministic score: 72
+LLM, with RAG context              [50, 50, 50, 50]  mean=50.0  spread=0
+```
+
+更正后的结论：
+
+- **运行间波动很小**，0 到 15 分，SWE 岗四次完全相同。远不是「3 到 65」。
+- **真正的现象是系统性偏低**：LLM 一致地比确定性算法低 15 到 20 分，三个岗位皆然。
+  这是稳定偏差，不是噪声。
+- RAG 上下文使分数略微升高（48.8 对 42.5），方向合理。
+- 3 分是罕见离群值，在其后 12 次采样中未再出现。
+
+关于「是不是样例不合适」：**不是**。这份简历确实缺少 AI Intern JD 要求的
+PyTorch / TensorFlow / NLP，因此中等分数是正确结果，而非缺陷。README 截图已使用
+确定性路径，显示 68，本就是合理数字，无需更换样例。
+
+### 测量过程中发现的真实缺陷
+
+不带 RAG 上下文的那一组最初直接崩溃：
+
+```text
+pydantic_core._pydantic_core.ValidationError: 1 validation error for MatchReport
+overall_score
+  Input should be a valid integer, got a number with a fractional part
+  [type=int_from_float, input_value=0.4, input_type=float]
+```
+
+模型返回了 `"overall_score": 0.4` —— 用 0-1 而非 0-100 的量纲。Pydantic 拒绝该值，
+`run_node()` 捕获异常后改用确定性 fallback。也就是说：**模型给出了答案，系统把它
+丢掉了**，用户看到的是 fallback 结果，界面上只留下一条错误记录。
+
+这正是项目文档声称已处理的 schema drift，但 `structured_output.py` 未覆盖量纲这一类。
+
+新增 `normalize_overall_score()`：0 到 1 之间的小数按百分比换算，字符串与百分号
+形式一并处理，其余小数四舍五入。`0` 和 `1` 保持原样 —— 二者都是合法的 0-100 分数，
+无从判断模型用的是哪种量纲，不应擅自放大 100 倍。
+
+新增 9 条参数化测试覆盖上述各种形式。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+166 passed in 3.74s
+```
+
+修复后重跑同一组测量，不带 RAG 的那一组不再崩溃，正常返回 [40, 40, 50, 40]。
+
+系统性偏低这一现象记入 README 已知限制与实施计划的技术债，供仓库所有者判断是否
+需要处理。本条不改变打分逻辑本身。
+
+
+## Slice 14: 代码评审后的修正
+
+仓库所有者要求不再自行 review，改由我调用评审流程后直接整合。使用
+`superpowers:requesting-code-review` 对 slice 10-13 的全部改动做了一次独立评审
+（base `2b790e7`，head `70fea64`）。评审未发现 Critical 问题，但指出 7 项 Important，
+其中数项是对我推理本身的纠正。以下是实际修复内容。
+
+### 一、只有标题没有内容的 chunk（真实潜伏缺陷）
+
+`split_markdown()` 的 flush 判断用的是 `current.strip()`，而 `current` 一开始就被
+塞进了标题，因此恒为真。当某一节的第一个段落本身就超过 `chunk_size` 时，第一轮循环
+就会产出一个**只含标题、没有任何正文**的 chunk：
+
+```python
+>>> split_markdown("# H\n\n" + "x"*300, "f", "c", "t", chunk_size=200)
+[KnowledgeChunk(content='# H', ...), KnowledgeChunk(content='# H\n\nxxx…', ...)]
+```
+
+评审用 2000 组随机数据验证，其中 997 组触发。当前知识库未触发，仅因最长段落 478
+字符远小于 1200。危害不只是浪费一个槽位：空 chunk 仍会因标题匹配获得高分，从而挤占
+检索结果并把空内容送进 prompt。
+
+改为显式追踪 `has_body`。同时补测试 —— 原有的
+`test_a_long_section_splits_but_keeps_its_heading` 用 `startswith("# Long Section")`
+断言，对只含标题的 chunk 同样成立，**捕捉不到这个缺陷**。
+
+### 二、`has_semantic_embeddings()` 可能抛异常中断整个分析
+
+配置 `EMBEDDING_PROVIDER=openai` 但没有 OpenAI key 时，`get_embeddings()` 会抛异常。
+`rag_retriever_node` 没有 try/except，也不经过 `run_node`，异常会一路冒泡终止工作流。
+而 README 与 AGENTS.md 恰恰把 `EMBEDDING_PROVIDER=openai` 作为启用向量库的推荐方式
+写在文档里。这违反了项目「可选依赖缺失时应降级而非崩溃」的原则。已加保护并补测试。
+
+### 三、我的新指标同样是常量（对推理的纠正）
+
+评审指出：`rag_corpus_fraction` 恒为 `16/44 = 0.3636`，每一行、每一次运行都一样。
+因为 `fallback_retrieve` 总是取满 k，而语料已超过请求量，这个值由构造决定。
+
+**这正是我在 slice 10 批评 `rag_snippet_count` 时用的同一个论证** —— 我用一个新的
+常量替换了旧的常量，还宣称已经解决。评审的判断是对的。
+
+修复分两部分：
+
+- 重命名为 `rag_corpus_headroom`，docstring 明确它是**语料规模的守卫**而非质量度量：
+  1.0 表示检索没有选择余地，这是它唯一能捕捉的失效。
+- 新增 `rag_context_overlap()` —— 不同岗位检索结果之间的平均 Jaccard 重合度。这是
+  真正会随排序质量变化的指标：旧分块下为 1.0（三个岗位拿到完全相同的内容），当前为
+  **0.3737**。它是跨案例的，因此由 `eval/run_eval.py` 输出而非放进逐案例的指标行。
+
+```text
+$ python eval/run_eval.py
+Mode: deterministic. Pass --live to call the real LLM.
+RAG context overlap across the 3 cases: 0.3737 (1.0 = every role got the same snippets)
+```
+
+### 四、停用词拿到了标题权重
+
+`_query_terms` 以 `len(term) > 2` 过滤，保留了 "and"；而 category 匹配是子串判断，
+因此任何含 "And" 的标题都会仅凭 "and" 拿到 4 分：
+
+```text
+query "python and sql analysis" ->
+  data_analysis 7 | backend_and_api 4 | testing_and_quality 4 | machine_learning 2
+```
+
+「Backend And API」与「Testing And Quality」压过了「Machine Learning」。当前三个样例
+JD 的技能都是单词，尚未触发，但 LLM 分析器经常返回多词技能。改为对标题分词后做整词
+匹配，并剔除连接词。
+
+### 五、四条无效或过弱的测试
+
+- `test_vectorstore_can_still_be_forced` **没有任何断言** —— 即使强制开关从未被读取
+  也会通过。改为断言确实绕过了嵌入门控。
+- `test_retrieval_does_not_return_the_whole_corpus` 断言 `< 0.5`，但该值上限就是
+  0.36，**永远不可能失败**。改为与请求量对比。
+- `has_semantic_embeddings()` 的 True 分支此前无测试覆盖。
+- `tests/conftest.py` 未固定 `EMBEDDING_PROVIDER`。按文档配置了
+  `EMBEDDING_PROVIDER=openai` 的维护者，本地会看到检索测试失败而 CI 通过。已固定。
+
+### 六、我自己已推翻却仍留在文档里的说法
+
+评审指出「3 到 65」这个已被 slice 13 推翻的数字，仍然留在 `README.md` 的截图说明和
+`capture_streamlit_screenshot.mjs` 的注释里 —— README 甚至在 33 行之后就写着更正后的
+版本，自相矛盾。另有两处「截图待更新」的待办，而 slice 12 已经做完，README 在该条目
+上方 45 行处就嵌入了新截图。四处全部清理。
+
+评审的评语值得记下：slice 13 本身就是关于「纠正一个夸大的结论」，把那个结论留在
+README 里会削弱这条分支最有价值的部分。
+
+### 其他采纳的小项
+
+- `load_all_knowledge_docs()` 加 `lru_cache`：此前 `retrieve_context()` 每次会把 5 个
+  文件完整读取并解析 5 遍。
+- `_category_of()` 折叠空白：标题后若无空行，正文会被并入标题，导致 category 含换行。
+- `evaluation.py` 的函数内 import 改为顶层 —— 评审核实过不存在循环依赖，函数内 import
+  只是把 `services -> rag` 这条依赖边对工具隐藏了，边本身依然存在。
+- 补充 docstring：标题命中实际是 `1 + HEADING_WEIGHT = 4` 倍，而非 3 倍。
+- `split_markdown()` 中一个恒为真的死条件已移除。
+
+### 未采纳的项
+
+评审建议截图工具改为向上逐级查找 `.venv` 而非硬编码 worktree 深度，以及把 Compare
+流程里的固定 `sleep(3000)` 换成 `waitForText`。两项都合理，但属于工具健壮性而非产品
+代码，当前可用，记在此处备查。
+
+### 验证
+
+```text
+$ ruff check .
+All checks passed!
+
+$ pytest --basetemp=.pytest_tmp
+174 passed in 3.63s
+
+$ python eval/run_eval.py   （连续两次）
+输出逐字节一致
+```
+
+测试数从 166 增至 174。本条无 API 调用，不产生费用。
