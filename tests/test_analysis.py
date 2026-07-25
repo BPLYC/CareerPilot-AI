@@ -56,6 +56,25 @@ def test_cache_hit_does_not_record_history_again(fake_st, monkeypatch):
     assert any("缓存" in message for message in fake_st.infos)
 
 
+def test_online_run_rejects_cached_fallback_result():
+    cached = {
+        "match_report": {"overall_score": 8},
+        "fallback_nodes": ["ResumeParserNode", "JDAnalyzerNode", "MatchScoringNode"],
+    }
+
+    assert not analysis.cache_result_is_usable(cached, llm_available=True)
+    assert analysis.cache_result_is_usable(cached, llm_available=False)
+
+
+def test_online_run_rejects_legacy_connection_error_cache():
+    cached = {
+        "match_report": {"overall_score": 8},
+        "errors": ["ResumeParserNode failed: Connection error."],
+    }
+
+    assert not analysis.cache_result_is_usable(cached, llm_available=True)
+
+
 def test_fresh_run_records_history_exactly_once(fake_st, monkeypatch):
     recorded = []
     monkeypatch.setattr(analysis, "load_from_cache", lambda key: None)

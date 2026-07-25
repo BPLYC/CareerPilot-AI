@@ -2,6 +2,7 @@
 
 import streamlit as st
 
+from src.agents.common import can_use_llm
 from src.services.cache import get_cache_key, load_from_cache, save_to_cache
 from src.services.provider_config import provider_overrides
 from src.services.run_history import record_run
@@ -25,6 +26,16 @@ def save_cache_safely(cache_key: str, state: dict) -> None:
         st.warning(f"无法缓存分析结果：{exc}")
 
 
+def cache_result_is_usable(cached: dict | None, llm_available: bool) -> bool:
+    if not cached:
+        return False
+    if not llm_available:
+        return True
+    if cached.get("fallback_nodes"):
+        return False
+    return not any("Connection error" in error for error in cached.get("errors", []))
+
+
 def run_analysis(
     resume_text: str,
     jd_text: str,
@@ -33,8 +44,9 @@ def run_analysis(
 ) -> dict:
     application_questions = application_questions or []
     key = get_cache_key(resume_text, jd_text, application_questions)
+    llm_available = can_use_llm()
     cached = load_from_cache(key)
-    if cached:
+    if cache_result_is_usable(cached, llm_available):
         # A cache hit re-displays an earlier analysis; it is not a new run, so
         # history is left untouched to avoid duplicate rows for one analysis.
         st.info("已加载相同简历和职位描述的缓存分析结果。")
@@ -53,6 +65,7 @@ def run_analysis(
                 st.write(f"{node_name}：{traces[-1] if traces else '已完成'}")
         status.update(label="分析完成", state="complete")
 
-    save_cache_safely(key, final_state)
+    if not (llm_available and final_state.get("fallback_nodes")):
+        save_cache_safely(key, final_state)
     save_run_history(key, final_state)
     return final_state
