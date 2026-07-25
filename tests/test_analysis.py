@@ -53,7 +53,7 @@ def test_cache_hit_does_not_record_history_again(fake_st, monkeypatch):
     assert result["match_report"]["overall_score"] == 70
     # Viewing a cached result is not a new analysis; history must not grow.
     assert recorded == []
-    assert any("cached" in message.lower() for message in fake_st.infos)
+    assert any("缓存" in message for message in fake_st.infos)
 
 
 def test_fresh_run_records_history_exactly_once(fake_st, monkeypatch):
@@ -84,4 +84,4 @@ def test_completed_analysis_survives_a_cache_write_failure(fake_st, monkeypatch)
     assert result is not None
     assert result.get("match_report")
     assert len(recorded) == 1
-    assert any("cache" in message.lower() for message in fake_st.warnings)
+    assert any("缓存" in message for message in fake_st.warnings)

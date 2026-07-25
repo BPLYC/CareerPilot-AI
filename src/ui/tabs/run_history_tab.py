@@ -5,16 +5,16 @@ import streamlit as st
 from src.services.run_history import list_recent_runs
 
 COLUMNS = [
-    ("Time", "created_at"),
-    ("Role", "job_title"),
-    ("Score", "match_score"),
-    ("Matched", "matched_skills_count"),
-    ("Missing", "missing_skills_count"),
-    ("Bullets", "optimized_bullets_count"),
-    ("Answers", "application_answer_count"),
-    ("Interview Qs", "interview_question_count"),
-    ("Warnings", "warnings_count"),
-    ("Errors", "errors_count"),
+    ("时间", "created_at"),
+    ("职位", "job_title"),
+    ("评分", "match_score"),
+    ("匹配技能", "matched_skills_count"),
+    ("缺失技能", "missing_skills_count"),
+    ("简历建议", "optimized_bullets_count"),
+    ("申请回答", "application_answer_count"),
+    ("面试问题", "interview_question_count"),
+    ("警告", "warnings_count"),
+    ("错误", "errors_count"),
 ]
 
 
@@ -23,16 +23,16 @@ def to_rows(runs: list[dict]) -> list[dict]:
 
 
 def render(limit: int = 10) -> None:
-    st.markdown("#### Recent Local Runs")
+    st.markdown("#### 最近的本地运行记录")
     try:
         runs = list_recent_runs(limit=limit)
     except Exception as exc:
         runs = []
-        st.warning(f"Run history could not be loaded: {exc}")
+        st.warning(f"无法加载运行历史：{exc}")
 
     if not runs:
-        st.info("Run an analysis to create local history.")
+        st.info("运行一次分析后，这里会显示本地历史记录。")
         return
 
-    st.caption("History stores summary metadata only. Raw resumes and job descriptions are not persisted.")
+    st.caption("历史记录仅保存摘要元数据，不会保存原始简历和职位描述。")
     st.dataframe(to_rows(runs), use_container_width=True, hide_index=True)

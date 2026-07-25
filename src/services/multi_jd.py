@@ -123,14 +123,14 @@ def to_table_rows(result: ComparisonResult) -> list[dict]:
     for rank, job in enumerate(result.ranked, start=1):
         rows.append(
             {
-                "Rank": rank,
-                "Job": job.label,
-                "Detected Role": job.job_title,
-                "Score": "-" if job.failed else job.score,
-                "Matched": len(job.matched_skills),
-                "Missing": len(job.missing_skills),
-                "Bullets": job.bullet_count,
-                "Status": job.failure_reason if job.failed else "OK",
+                "排名": rank,
+                "职位": job.label,
+                "识别职位": job.job_title,
+                "评分": "-" if job.failed else job.score,
+                "匹配技能": len(job.matched_skills),
+                "缺失技能": len(job.missing_skills),
+                "简历建议": job.bullet_count,
+                "状态": job.failure_reason if job.failed else "正常",
             }
         )
     return rows

@@ -9,6 +9,8 @@ from src.ui.sample_data import SAMPLE_JDS, load_sample
 
 THINKING_OPTIONS = ["disabled", "enabled"]
 EFFORT_OPTIONS = ["low", "medium", "high"]
+THINKING_LABELS = {"disabled": "关闭", "enabled": "开启"}
+EFFORT_LABELS = {"low": "低", "medium": "中", "high": "高"}
 
 
 @dataclass
@@ -43,32 +45,34 @@ def render_sidebar() -> ProviderSettings:
 
         config = get_provider_config()
         if config.api_key:
-            st.success("DeepSeek API key configured")
+            st.success("已配置 DeepSeek API 密钥")
         else:
-            st.warning("DeepSeek API key missing; deterministic fallback will be used.")
+            st.warning("未配置 DeepSeek API 密钥，将使用确定性离线模式。")
 
-        model = st.text_input("Model", value=config.model, placeholder="Enter your DeepSeek model")
+        model = st.text_input("模型", value=config.model, placeholder="请输入 DeepSeek 模型名称")
 
         thinking = st.selectbox(
-            "Thinking Mode",
+            "深度思考模式",
             THINKING_OPTIONS,
             index=_index_of(THINKING_OPTIONS, config.thinking),
+            format_func=THINKING_LABELS.get,
         )
         reasoning_effort = st.selectbox(
-            "Reasoning Effort",
+            "推理强度",
             EFFORT_OPTIONS,
             index=_index_of(EFFORT_OPTIONS, config.reasoning_effort),
             disabled=thinking == "disabled",
+            format_func=EFFORT_LABELS.get,
         )
 
-        st.caption(f"Base URL: {config.base_url}")
+        st.caption(f"接口地址：{config.base_url}")
         st.divider()
 
-        selected_jd = st.selectbox("Select Sample JD", list(SAMPLE_JDS))
-        if st.button("Load Sample Data", use_container_width=True):
+        selected_jd = st.selectbox("选择示例职位", list(SAMPLE_JDS))
+        if st.button("加载示例数据", use_container_width=True):
             resume_text, jd_text = load_sample(selected_jd)
             st.session_state["sample_resume"] = resume_text
             st.session_state["sample_jd"] = jd_text
-            st.success("Sample data loaded")
+            st.success("示例数据已加载")
 
     return ProviderSettings(model=model, thinking=thinking, reasoning_effort=reasoning_effort)

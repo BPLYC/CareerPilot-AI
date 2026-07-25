@@ -54,8 +54,8 @@ def test_run_history_rows_use_display_labels():
 
     rows = to_rows(runs)
 
-    assert rows[0]["Role"] == "AI Intern"
-    assert rows[0]["Score"] == 65
+    assert rows[0]["职位"] == "AI Intern"
+    assert rows[0]["评分"] == 65
     assert "job_title" not in rows[0]
 
 

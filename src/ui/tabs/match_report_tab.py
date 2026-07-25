@@ -7,18 +7,18 @@ from src.services.report_export import build_markdown_report, suggested_filename
 
 def render(state: dict | None) -> None:
     if not state or not state.get("match_report"):
-        st.info("Run the analysis first.")
+        st.info("请先运行分析。")
         return
 
     report = state["match_report"]
 
     st.download_button(
-        "Download full report (Markdown)",
+        "下载完整报告（Markdown）",
         data=build_markdown_report(state),
         file_name=suggested_filename(state),
         mime="text/markdown",
         use_container_width=True,
-        help="Match report, bullet suggestions, application answers, and interview questions.",
+        help="包含匹配报告、简历要点建议、申请回答和面试问题。",
     )
     reference = state.get("reference_score")
     score = report["overall_score"]
@@ -26,19 +26,19 @@ def render(state: dict | None) -> None:
 
     if show_reference:
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("AI Score", f"{score}/100")
-        col2.metric("Rule-based Score", f"{reference}/100")
-        col3.metric("Matched Skills", len(report["matched_skills"]))
-        col4.metric("Missing Skills", len(report["missing_skills"]))
+        col1.metric("AI 评分", f"{score}/100")
+        col2.metric("规则基准评分", f"{reference}/100")
+        col3.metric("匹配技能", len(report["matched_skills"]))
+        col4.metric("缺失技能", len(report["missing_skills"]))
         st.caption(
-            "Two scores: the AI's assessment and a deterministic rule-based baseline. "
-            "They usually differ; when they diverge sharply, the skills below are the more reliable read."
+            "这里同时展示 AI 评估和确定性规则基准评分。两者通常会有差异；"
+            "当分差较大时，下方的匹配与缺失技能更值得参考。"
         )
     else:
         col1, col2, col3 = st.columns(3)
-        col1.metric("Match Score", f"{score}/100")
-        col2.metric("Matched Skills", len(report["matched_skills"]))
-        col3.metric("Missing Skills", len(report["missing_skills"]))
+        col1.metric("匹配评分", f"{score}/100")
+        col2.metric("匹配技能", len(report["matched_skills"]))
+        col3.metric("缺失技能", len(report["missing_skills"]))
     st.progress(score / 100)
 
     for warning in state.get("warnings", []):
@@ -46,13 +46,13 @@ def render(state: dict | None) -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### Matched Skills")
+        st.markdown("#### 匹配技能")
         for skill in report["matched_skills"]:
             st.success(skill)
     with col2:
-        st.markdown("#### Missing Skills")
+        st.markdown("#### 缺失技能")
         for skill in report["missing_skills"]:
             st.error(skill)
 
-    st.markdown("#### Analysis")
+    st.markdown("#### 分析说明")
     st.write(report["explanation"])

@@ -13,7 +13,7 @@ def save_run_history(cache_key: str, state: dict) -> None:
     try:
         record_run(cache_key, state)
     except Exception as exc:
-        st.warning(f"Run history could not be saved: {exc}")
+        st.warning(f"无法保存运行历史：{exc}")
 
 
 def save_cache_safely(cache_key: str, state: dict) -> None:
@@ -22,7 +22,7 @@ def save_cache_safely(cache_key: str, state: dict) -> None:
     try:
         save_to_cache(cache_key, state)
     except Exception as exc:
-        st.warning(f"Result could not be cached: {exc}")
+        st.warning(f"无法缓存分析结果：{exc}")
 
 
 def run_analysis(
@@ -37,21 +37,21 @@ def run_analysis(
     if cached:
         # A cache hit re-displays an earlier analysis; it is not a new run, so
         # history is left untouched to avoid duplicate rows for one analysis.
-        st.info("Loaded cached analysis for the same resume and JD.")
+        st.info("已加载相同简历和职位描述的缓存分析结果。")
         return cached
 
     state = create_initial_state(resume_text, jd_text, application_questions)
     final_state = state
     overrides = settings.as_overrides() if settings else {}
-    with st.status("Running CareerPilot Analysis...", expanded=True) as status:
+    with st.status("CareerPilot 正在分析...", expanded=True) as status:
         # Provider settings are applied only while the workflow runs, so
         # rendering the sidebar does not leave them set process-wide.
         with provider_overrides(**overrides):
             for event in stream_workflow(state):
                 node_name, final_state = next(iter(event.items()))
                 traces = final_state.get("workflow_trace", [])
-                st.write(f"{node_name}: {traces[-1] if traces else 'completed'}")
-        status.update(label="Analysis complete", state="complete")
+                st.write(f"{node_name}：{traces[-1] if traces else '已完成'}")
+        status.update(label="分析完成", state="complete")
 
     save_cache_safely(key, final_state)
     save_run_history(key, final_state)

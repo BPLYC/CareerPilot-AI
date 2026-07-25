@@ -135,21 +135,21 @@ def test_table_rows_are_ranked_and_labelled():
 
     rows = to_table_rows(result)
 
-    assert rows[0]["Rank"] == 1
-    assert rows[0]["Job"] == "High"
-    assert rows[0]["Status"] == "OK"
-    assert rows[1]["Job"] == "Low"
+    assert rows[0]["排名"] == 1
+    assert rows[0]["职位"] == "High"
+    assert rows[0]["状态"] == "正常"
+    assert rows[1]["职位"] == "Low"
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("first jd\n===\nsecond jd", [("Job 1", "first jd"), ("Job 2", "second jd")]),
+        ("first jd\n===\nsecond jd", [("职位 1", "first jd"), ("职位 2", "second jd")]),
         ("# AI Intern\nbody one\n===\n# SWE\nbody two", [("AI Intern", "body one"), ("SWE", "body two")]),
-        ("only one jd", [("Job 1", "only one jd")]),
+        ("only one jd", [("职位 1", "only one jd")]),
         ("", []),
         ("\n===\n\n===\n", []),
-        ("# \nbody", [("Job 1", "body")]),
+        ("# \nbody", [("职位 1", "body")]),
     ],
 )
 def test_split_job_descriptions(text, expected):

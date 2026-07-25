@@ -17,13 +17,13 @@ from src.ui.tabs import (
 )
 
 TAB_LABELS = [
-    "Input",
-    "Match Report",
-    "Resume Tips",
-    "Application & Interview",
-    "Compare Jobs",
-    "Workflow Trace",
-    "Run History",
+    "信息输入",
+    "匹配报告",
+    "简历优化",
+    "申请与面试",
+    "职位对比",
+    "工作流记录",
+    "运行历史",
 ]
 
 
@@ -33,7 +33,7 @@ def main() -> None:
     settings = render_sidebar()
 
     st.title("CareerPilot AI")
-    st.caption("LangGraph-based Multi-Agent RAG System for Resume-JD Matching")
+    st.caption("基于 LangGraph 的多智能体 RAG 简历与职位匹配系统")
 
     tabs = st.tabs(TAB_LABELS)
 

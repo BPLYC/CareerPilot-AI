@@ -11,13 +11,13 @@ import pytest
 AppTest = pytest.importorskip("streamlit.testing.v1").AppTest
 
 TAB_LABELS = [
-    "Input",
-    "Match Report",
-    "Resume Tips",
-    "Application & Interview",
-    "Compare Jobs",
-    "Workflow Trace",
-    "Run History",
+    "信息输入",
+    "匹配报告",
+    "简历优化",
+    "申请与面试",
+    "职位对比",
+    "工作流记录",
+    "运行历史",
 ]
 
 
@@ -46,9 +46,9 @@ def test_compare_tab_renders_its_controls():
     button_labels = [button.label for button in app.button]
     textarea_labels = [area.label for area in app.text_area]
 
-    assert "Compare roles" in button_labels
-    assert "Load all sample JDs" in button_labels
-    assert "Job descriptions" in textarea_labels
+    assert "开始职位对比" in button_labels
+    assert "加载全部示例职位" in button_labels
+    assert "职位描述" in textarea_labels
 
 
 def test_sidebar_offers_the_provider_controls():
@@ -57,16 +57,16 @@ def test_sidebar_offers_the_provider_controls():
         element.label for element in app.sidebar.text_input
     ]
 
-    assert "Model" in sidebar_labels
-    assert "Thinking Mode" in sidebar_labels
-    assert "Reasoning Effort" in sidebar_labels
+    assert "模型" in sidebar_labels
+    assert "深度思考模式" in sidebar_labels
+    assert "推理强度" in sidebar_labels
 
 
 def test_untouched_tabs_prompt_for_an_analysis_rather_than_erroring():
     app = _run()
     messages = [element.value for element in app.info]
 
-    assert any("Run the analysis first" in message for message in messages)
+    assert any("请先运行分析" in message for message in messages)
 
 
 def test_download_button_appears_once_a_result_exists():
@@ -90,12 +90,12 @@ def test_download_button_appears_once_a_result_exists():
     # shows st.download_button accepted the generated report.
     assert not app.exception, [str(e) for e in app.exception]
     labels = [element.label for element in app.get("download_button")]
-    assert "Download full report (Markdown)" in labels
+    assert "下载完整报告（Markdown）" in labels
 
     metrics = {element.label: element.value for element in app.metric}
     # No API key in tests, so the model IS the reference scorer and the two
     # agree, collapsing to the single-score layout.
-    assert "Match Score" in metrics
+    assert "匹配评分" in metrics
 
 
 def test_diverging_scores_render_side_by_side():
@@ -116,8 +116,8 @@ def test_diverging_scores_render_side_by_side():
 
     assert not app.exception, [str(e) for e in app.exception]
     labels = {element.label for element in app.metric}
-    assert {"AI Score", "Rule-based Score"} <= labels
-    assert "Match Score" not in labels
+    assert {"AI 评分", "规则基准评分"} <= labels
+    assert "匹配评分" not in labels
 
 
 def test_load_all_sample_jds_actually_fills_the_boxes():
@@ -134,7 +134,7 @@ def test_load_all_sample_jds_actually_fills_the_boxes():
     app = AppTest.from_file("app.py", default_timeout=60)
     app.run()
 
-    button = next(b for b in app.button if b.label == "Load all sample JDs")
+    button = next(b for b in app.button if b.label == "加载全部示例职位")
     button.click().run()
 
     assert not app.exception, [str(e) for e in app.exception]
@@ -151,8 +151,8 @@ def test_comparison_runs_end_to_end_in_the_ui():
 
     app = AppTest.from_file("app.py", default_timeout=120)
     app.run()
-    next(b for b in app.button if b.label == "Load all sample JDs").click().run()
-    next(b for b in app.button if b.label == "Compare roles").click().run()
+    next(b for b in app.button if b.label == "加载全部示例职位").click().run()
+    next(b for b in app.button if b.label == "开始职位对比").click().run()
 
     assert not app.exception, [str(e) for e in app.exception]
     result = app.session_state["comparison_result"]
