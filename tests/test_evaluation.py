@@ -1,4 +1,4 @@
-from src.services.evaluation import evaluate_state
+from src.services.evaluation import audit_unsupported_claims, evaluate_state
 from src.services.scoring import action_evidence_rate, result_evidence_rate, star_coverage_rate
 
 
@@ -92,3 +92,23 @@ def test_evaluation_counts_phase_two_quality_metrics():
     assert metrics["workflow_trace_count"] == 3
     assert metrics["reflection_review_count"] == 1
     assert metrics["phase_two_parallel_count"] == 1
+    assert metrics["unsupported_skill_mention_count"] == 1
+    assert metrics["unsupported_claim_count"] == 1
+
+
+def test_unsupported_claim_audit_is_explicit_and_evidence_based():
+    audit = audit_unsupported_claims(
+        [
+            "Built Task Manager with Python and improved throughput by 50%.",
+            "Deployed Kubernetes for Quantum Ledger.",
+        ],
+        "Built Task Manager with Python.",
+        {"skills": ["Python"], "projects": [{"name": "Task Manager", "technologies": ["Python"]}]},
+        candidate_skills=["Python", "Kubernetes"],
+        candidate_projects=["Task Manager", "Quantum Ledger"],
+    )
+
+    assert audit["unsupported_metrics"] == ["50%"]
+    assert audit["unsupported_skills"] == ["Kubernetes"]
+    assert audit["unsupported_projects"] == ["Quantum Ledger"]
+    assert audit["unsupported_claim_count"] == 3

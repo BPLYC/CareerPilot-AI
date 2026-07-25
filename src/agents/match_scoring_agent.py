@@ -1,10 +1,12 @@
 """Match scoring node."""
 
+import re
+
 from src.agents.common import invoke_structured, run_node
 from src.models.schemas import MatchReport
 from src.services.prompts import MATCH_SCORING_SYSTEM, context_block, schema_instruction
 from src.services.scoring import keyword_coverage, matched_and_missing_skills, skill_match_rate
-from src.services.skill_taxonomy import find_known_skills
+from src.services.skill_taxonomy import find_known_skills, transferable_skills
 from src.services.structured_output import model_to_dict, validate_dict
 from src.utils.text_utils import unique_preserve_order
 
@@ -48,9 +50,84 @@ def _has_role_evidence(text: str, jd_analysis: dict) -> bool:
 
 def _education_score(resume_profile: dict, jd_analysis: dict) -> int:
     requirement = (jd_analysis.get("education_requirements") or "").strip()
-    if not requirement:
+    level = jd_analysis.get("education_level")
+    major = jd_analysis.get("education_major")
+    graduation = jd_analysis.get("graduation_requirement")
+    gpa = jd_analysis.get("gpa_requirement")
+    is_required = jd_analysis.get("education_is_required")
+    has_structured_requirement = any(value is not None for value in (level, major, graduation, gpa))
+    if not requirement and not has_structured_requirement:
         return BREAKDOWN_LIMITS["education"]
-    return BREAKDOWN_LIMITS["education"] if resume_profile.get("education") else 0
+    education = resume_profile.get("education") or []
+    if not education:
+        return 0 if is_required is not False else 5
+
+    # Education evidence exists, but unknown fields are not treated as a match.
+    if not has_structured_requirement:
+        return 7
+
+    def known(value) -> bool:
+        return bool(value and str(value).strip().lower() not in {"unknown", "n/a", "none"})
+
+    level_rank = {"associate": 1, "bachelor": 2, "master": 3, "doctorate": 4}
+
+    def resume_level(degree: str) -> str | None:
+        lowered = degree.lower()
+        if re.search(r"\b(?:phd|doctorate|doctoral)\b|博士", lowered):
+            return "doctorate"
+        if re.search(r"\b(?:master|msc|ma|meng)\b|硕士|研究生", lowered):
+            return "master"
+        if re.search(r"\b(?:bachelor|bsc|bs|ba|beng)\b|本科|学士", lowered):
+            return "bachelor"
+        if re.search(r"\bassociate\b|专科|大专", lowered):
+            return "associate"
+        return None
+
+    checks: list[bool | None] = []
+    if level:
+        observed = [resume_level(str(item.get("degree", ""))) for item in education]
+        known_levels = [candidate for candidate in observed if candidate]
+        checks.append(
+            max((level_rank[candidate] for candidate in known_levels), default=0)
+            >= level_rank.get(str(level).lower(), 99)
+            if known_levels
+            else None
+        )
+    if major:
+        required_terms = {
+            term
+            for term in re.findall(r"[\w\u4e00-\u9fff]+", str(major).lower())
+            if len(term) > 2 and term not in {"related", "field", "degree", "专业", "相关"}
+        }
+        observed_majors = [
+            str(item.get("major", "")).lower() for item in education if known(item.get("major"))
+        ]
+        checks.append(
+            any(any(term in observed for term in required_terms) for observed in observed_majors)
+            if observed_majors and required_terms
+            else None
+        )
+    if graduation:
+        observed_dates = [
+            str(item.get("graduation_date", "")) for item in education if known(item.get("graduation_date"))
+        ]
+        required_years = {int(year) for year in re.findall(r"20\d{2}", str(graduation))}
+        observed_years = {int(year) for text in observed_dates for year in re.findall(r"20\d{2}", text)}
+        if observed_years and required_years:
+            low, high = min(required_years), max(required_years)
+            checks.append(any(low <= year <= high for year in observed_years))
+        else:
+            checks.append(None)
+    if gpa is not None:
+        # Resume schema intentionally has no GPA field. Do not infer it from school or degree.
+        checks.append(None)
+
+    known_checks = [check for check in checks if check is not None]
+    if False in known_checks:
+        return 2 if is_required is not False else 5
+    if known_checks and len(known_checks) == len(checks):
+        return BREAKDOWN_LIMITS["education"]
+    return 7
 
 
 def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
@@ -75,6 +152,8 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
     ]
     experience_score = min(BREAKDOWN_LIMITS["experience_evidence"], len(relevant_experience) * 8)
     education_score = _education_score(resume_profile, jd_analysis)
+    preferred_matched, _ = matched_and_missing_skills(skills, preferred)
+    transfer_evidence = transferable_skills(skills, missing)
     breakdown = {
         "required_skills": skill_score,
         "preferred_skills": preferred_score,
@@ -83,6 +162,22 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
         "education": education_score,
     }
     total = sum(breakdown.values())
+    score_evidence = {
+        "required_skills": matched or ["未找到明确匹配的必需技能"],
+        "preferred_skills": preferred_matched or ["未找到明确匹配的加分技能"],
+        "project_evidence": relevant_projects or ["未找到与职位直接相关的项目证据"],
+        "experience_evidence": [
+            item.get("role") or item.get("company") or "相关工作经历"
+            for item in relevant_experience
+        ] or ["未找到与职位直接相关的工作经历"],
+        "education": [
+            (
+                "JD 未设置明确教育门槛"
+                if not jd_analysis.get("education_requirements")
+                else f"教育要求证据得分 {education_score}/{BREAKDOWN_LIMITS['education']}"
+            )
+        ],
+    }
     score_reliable = bool(required)
     scoring_warnings = []
     if not score_reliable:
@@ -108,6 +203,8 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
                 "总分由必需技能、加分技能、相关项目、相关工作经历和教育要求五个分项相加得到。"
             ),
             score_breakdown=breakdown,
+            score_evidence=score_evidence,
+            transferable_skills=transfer_evidence,
             score_reliable=score_reliable,
             scoring_warnings=scoring_warnings,
         )
@@ -174,7 +271,7 @@ def match_scoring_node(state) -> dict:
             schema_instruction(
                 "MatchReport",
                 "overall_score,matched_skills,missing_skills,relevant_projects,weak_sections,explanation,"
-                "score_breakdown,score_reliable,scoring_warnings",
+                "score_breakdown,score_evidence,transferable_skills,score_reliable,scoring_warnings",
             )
             + "\n"
             + context_block(

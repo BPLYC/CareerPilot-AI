@@ -5,6 +5,7 @@ from src.services.scoring import keyword_coverage, matched_and_missing_skills, s
 def test_keyword_coverage():
     assert keyword_coverage("Python and SQL project", ["Python", "SQL", "Docker"]) == 2 / 3
     assert keyword_coverage("Built APIs with Python.", ["Python"]) == 1.0
+    assert keyword_coverage("参与大模型应用开发", ["大模型"]) == 1.0
 
 
 def test_skill_matching():
@@ -92,3 +93,22 @@ def test_score_is_the_sum_of_bounded_components():
 
     assert report["overall_score"] == sum(report["score_breakdown"].values())
     assert report["score_reliable"] is True
+
+
+def test_score_explains_exact_and_transferable_skill_evidence_separately():
+    report = fallback_score_match(
+        {"skills": ["Python", "Power BI"], "projects": [], "education": [], "work_experience": []},
+        {
+            "required_skills": ["Python", "Tableau"],
+            "preferred_skills": [],
+            "keywords": [],
+            "responsibilities": [],
+            "tools_and_technologies": [],
+            "education_requirements": "",
+        },
+    )
+
+    assert report["score_evidence"]["required_skills"] == ["Python"]
+    assert report["transferable_skills"] == {"Tableau": ["Power BI"]}
+    assert report["matched_skills"] == ["Python"]
+    assert report["missing_skills"] == ["Tableau"]

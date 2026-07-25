@@ -1,5 +1,7 @@
 """Evaluation metric helpers."""
 
+import re
+
 from src.rag.knowledge_loader import load_all_knowledge_docs
 from src.services.scoring import (
     action_evidence_rate,
@@ -26,6 +28,7 @@ SENSITIVE_TERMS = (
 
 FIXED_APPLICATION_FIELDS = ("why_this_role", "key_strengths", "project_example")
 ROLE_SPECIFIC_FOCUS_AREAS = {"ml evaluation", "analytics validation", "software engineering"}
+METRIC_PATTERN = re.compile(r"\b\d+(?:\.\d+)?%|\b\d+(?:\.\d+)?x\b|\$\d+(?:\.\d+)?", re.IGNORECASE)
 
 
 def rag_corpus_headroom(retrieved_context: dict) -> float:
@@ -145,6 +148,66 @@ def _rate_with_field(items: list[dict], field: str) -> float:
     return sum(1 for item in items if item.get(field)) / len(items)
 
 
+def audit_unsupported_claims(
+    bullets: list[str],
+    resume_text: str,
+    resume_profile: dict,
+    *,
+    candidate_skills: list[str] | None = None,
+    candidate_projects: list[str] | None = None,
+) -> dict:
+    """Count explicit generated claims that have no resume evidence.
+
+    Candidate lists make the proxy auditable: it only judges named claims the
+    caller supplies (normally JD skills, plus controlled evaluation probes).
+    """
+
+    generated = " ".join(bullets)
+    evidence = " ".join(
+        [
+            resume_text or "",
+            " ".join(resume_profile.get("skills", []) or []),
+            " ".join(
+                str(value)
+                for project in resume_profile.get("projects", []) or []
+                for value in [project.get("name", ""), *(project.get("technologies", []) or [])]
+                if value
+            ),
+            " ".join(
+                str(value)
+                for work in resume_profile.get("work_experience", []) or []
+                for value in [work.get("company", ""), work.get("role", "")]
+                if value and str(value).lower() != "unknown"
+            ),
+        ]
+    )
+    generated_metrics = set(METRIC_PATTERN.findall(generated))
+    unsupported_metrics = sorted(metric for metric in generated_metrics if metric not in evidence)
+    unsupported_skills = sorted(
+        {
+            skill
+            for skill in candidate_skills or []
+            if contains_keyword(generated, skill) and not contains_keyword(evidence, skill)
+        }
+    )
+    unsupported_projects = sorted(
+        {
+            project
+            for project in candidate_projects or []
+            if contains_keyword(generated, project) and not contains_keyword(evidence, project)
+        }
+    )
+    return {
+        "unsupported_metric_count": len(unsupported_metrics),
+        "unsupported_skill_mention_count": len(unsupported_skills),
+        "unsupported_project_mention_count": len(unsupported_projects),
+        "unsupported_claim_count": len(unsupported_metrics) + len(unsupported_skills) + len(unsupported_projects),
+        "unsupported_metrics": unsupported_metrics,
+        "unsupported_skills": unsupported_skills,
+        "unsupported_projects": unsupported_projects,
+    }
+
+
 def evaluate_state(state: dict) -> dict:
     jd = state.get("jd_analysis") or {}
     resume = state.get("resume_profile") or {}
@@ -163,6 +226,16 @@ def evaluate_state(state: dict) -> dict:
     keyword_before = keyword_coverage(state.get("raw_resume_text", ""), jd.get("keywords", []))
     keyword_after = keyword_coverage(combined_resume_text, jd.get("keywords", []))
     focus_areas = {(item.get("focus_area") or "").lower() for item in interview_questions}
+    claim_audit = audit_unsupported_claims(
+        bullets,
+        state.get("raw_resume_text", ""),
+        resume,
+        candidate_skills=(jd.get("required_skills", []) or []) + (jd.get("preferred_skills", []) or []),
+        candidate_projects=(
+            state.get("evaluation_claim_candidates", {}).get("projects", [])
+            + [item.get("context", "") for item in state.get("optimized_bullets", []) if item.get("context")]
+        ),
+    )
     return {
         "keyword_coverage_before": keyword_before,
         "keyword_coverage_after": keyword_after,
@@ -195,4 +268,8 @@ def evaluate_state(state: dict) -> dict:
         "workflow_trace_count": len(workflow_trace),
         "reflection_review_count": sum(1 for item in workflow_trace if "ReflectionNode" in item),
         "phase_two_parallel_count": sum(1 for item in workflow_trace if "PhaseTwoParallelNode" in item),
+        "unsupported_metric_count": claim_audit["unsupported_metric_count"],
+        "unsupported_skill_mention_count": claim_audit["unsupported_skill_mention_count"],
+        "unsupported_project_mention_count": claim_audit["unsupported_project_mention_count"],
+        "unsupported_claim_count": claim_audit["unsupported_claim_count"],
     }

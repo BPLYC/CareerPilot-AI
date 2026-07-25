@@ -1510,3 +1510,12 @@ All checks passed!
 ```
 
 测试数从 190 增至 191。本条走确定性路径，无 API 调用，不产生费用。
+## 2026-07-26: Evidence, Parsing, And Ablation Integrity
+
+- Generalized offline resume sections and independent project/work parsing for English and Chinese resumes.
+- Structured JD education requirements and conservative education scoring without school-reputation inference.
+- Added component-level score evidence and non-scoring transferable-skill explanations.
+- Expanded reflection and evaluation audits to unsupported metrics, skills, and project/work contexts.
+- Fixed live ablation confounding by sharing one intake snapshot across variants.
+- Corrected live AI Intern smoke test: reference score stayed 50 across Full, no-RAG, and no-reflection. Unsupported claims were 0, 1, and 0 respectively; one run is not enough to claim a stable causal benefit.
+- DeepSeek budget: 5.47 CNY before corrected live verification, 5.37 CNY after; 2.00 CNY floor preserved.

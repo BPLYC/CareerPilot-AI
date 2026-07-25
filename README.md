@@ -158,7 +158,7 @@ Evaluation runs deterministically by default: it clears the DeepSeek credentials
 python eval/run_eval.py --live
 ```
 
-The script writes `outputs/evaluation_results.csv` with one row per case and method, `outputs/evaluation_comparison_summary.csv` with method-level averages, `outputs/scoring_calibration.csv` with synthetic score-monotonicity checks, and `outputs/evaluation_ablation_results.csv` with single-component RAG/reflection ablations. Metrics include keyword coverage, score components, bilingual action/result and STAR proxies, evidence coverage, interview coverage, RAG execution, reflection review, and workflow structure.
+The script writes method results and averages, synthetic score-monotonicity checks, paired RAG/reflection ablation results and summaries, plus a deterministic controlled reflection probe under `outputs/`. Metrics include keyword coverage, score components, bilingual action/result and STAR proxies, unsupported claim counts, evidence coverage, interview coverage, RAG execution, reflection review, and workflow structure.
 
 The deterministic match score uses a fixed, inspectable 100-point rubric: required skills 40, preferred skills 10, relevant project evidence 25, relevant work evidence 15, and education requirements 10. Projects and work entries earn credit only from evidence in their own text. If the JD parser cannot identify required skills, the score is marked provisional and cannot trigger the low-match cutoff.
 
@@ -176,6 +176,7 @@ The deterministic match score uses a fixed, inspectable 100-point rubric: requir
 - The AI score remains an approximate assessment and is shown beside the deterministic rubric when they differ. Workflow routing and multi-JD ranking use the stable rule-based score, so an anomalous model score cannot prematurely stop generation. A 20-point disagreement still raises a warning.
 - The bundled calibration suite checks monotonic behavior, not human agreement. Absolute calibration, MAE, and rank correlation require a larger human-labelled resume/JD set.
 - Deterministic RAG/reflection ablations can prove that components ran and whether proxy metrics changed; they do not by themselves establish real-model quality gains.
+- Ablation variants share one parsed resume/JD snapshot. Re-parsing each variant was measured to change the rule baseline for identical inputs, which confounds component attribution.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.

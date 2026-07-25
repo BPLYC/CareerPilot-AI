@@ -208,6 +208,8 @@ Does not call the LLM. It builds a query from job title, required skills, and to
 
 Produces `MatchReport` with a score from 0 to 100 and an inspectable breakdown: required skills 40, preferred skills 10, relevant project evidence 25, relevant work evidence 15, and education requirements 10. Project and work relevance is calculated only from each item's own evidence. Scores with no parsed required skills are provisional and do not trigger the low-match branch. The stable deterministic score controls routing; the model score remains visible as an advisory comparison.
 
+The report also carries evidence for each score component and related transferable skills. Related or same-category tools are explanatory only and never count as exact required-skill matches. Education constraints are represented separately as level, major, graduation window, GPA, and required/preferred status; unknown resume fields receive partial uncertainty credit rather than being inferred from school name.
+
 ### LowMatchWarningNode
 
 Runs when match score is below 45. It does not generate optimized bullets. It explains missing skills and next learning directions.

@@ -3,8 +3,10 @@ from src.services.comparison_evaluation import (
     METHOD_FULL,
     METHOD_LLM_ONLY,
     evaluate_ablations,
+    evaluate_controlled_reflection_probe,
     evaluate_methods,
     evaluate_score_perturbations,
+    summarize_ablations,
     summarize_comparison,
 )
 
@@ -61,3 +63,27 @@ def test_ablations_change_only_the_target_workflow_components():
     assert rows["Full"]["reflection_review_count"] > 0
     assert rows["Full-no-reflection"]["reflection_review_count"] == 0
     assert {row["phase_two_parallel_count"] for row in rows.values()} == {1}
+    assert len({row["reference_score"] for row in rows.values()}) == 1
+
+
+def test_controlled_reflection_probe_reduces_unsupported_claims_without_losing_evidence():
+    result = evaluate_controlled_reflection_probe()
+
+    assert result["before_unsupported_claim_count"] == 3
+    assert result["after_unsupported_claim_count"] == 0
+    assert result["grounded_evidence_preserved"] == 1
+    assert result["reflection_triggered"] == 1
+
+
+def test_summarize_ablations_keeps_components_separate():
+    summary = summarize_ablations(
+        [
+            {"case": "a", "ablation": "Full", "unsupported_claim_count": 0},
+            {"case": "b", "ablation": "Full", "unsupported_claim_count": 2},
+            {"case": "a", "ablation": "Full-no-RAG", "unsupported_claim_count": 3},
+            {"case": "a", "ablation": "Full-no-reflection", "unsupported_claim_count": 1},
+        ]
+    )
+
+    assert summary[0]["avg_unsupported_claim_count"] == 1.0
+    assert summary[1]["avg_unsupported_claim_count"] == 3.0

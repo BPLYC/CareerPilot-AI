@@ -31,6 +31,42 @@ SKILL_ALIASES = {
     "搜索算法": ["搜索算法"],
 }
 
+SKILL_CATEGORIES = {
+    "python": "programming",
+    "java": "programming",
+    "c++": "programming",
+    "sql": "data",
+    "postgresql": "database",
+    "sqlite": "database",
+    "tableau": "visualization",
+    "power bi": "visualization",
+    "pytorch": "machine_learning",
+    "tensorflow": "machine_learning",
+    "scikit-learn": "machine_learning",
+    "machine learning": "machine_learning",
+    "aws": "cloud",
+    "gcp": "cloud",
+    "flask": "backend",
+    "fastapi": "backend",
+    "rest api": "backend",
+}
+
+# Related tools are useful transfer evidence, but are deliberately not treated
+# as exact required-skill matches. The UI can explain them without inflating the
+# deterministic required-skill score.
+RELATED_SKILLS = {
+    "tableau": {"power bi"},
+    "power bi": {"tableau"},
+    "pytorch": {"tensorflow"},
+    "tensorflow": {"pytorch"},
+    "aws": {"gcp"},
+    "gcp": {"aws"},
+    "flask": {"fastapi"},
+    "fastapi": {"flask"},
+    "postgresql": {"sqlite"},
+    "sqlite": {"postgresql"},
+}
+
 
 def canonical_skill(value: str) -> str:
     """Return a stable comparison key while preserving display labels elsewhere."""
@@ -40,6 +76,35 @@ def canonical_skill(value: str) -> str:
         if lowered == skill.lower() or any(lowered == alias.lower() for alias in aliases):
             return skill.lower()
     return lowered
+
+
+def skill_relationship(candidate_skill: str, target_skill: str) -> str:
+    """Classify a skill pair as exact, related, same-category, or unrelated."""
+
+    candidate = canonical_skill(candidate_skill)
+    target = canonical_skill(target_skill)
+    if candidate == target:
+        return "exact"
+    if candidate in RELATED_SKILLS.get(target, set()):
+        return "related"
+    if SKILL_CATEGORIES.get(candidate) and SKILL_CATEGORIES.get(candidate) == SKILL_CATEGORIES.get(target):
+        return "same_category"
+    return "unrelated"
+
+
+def transferable_skills(resume_skills: list[str], missing_skills: list[str]) -> dict[str, list[str]]:
+    """Return related resume evidence for missing JD skills, preserving labels."""
+
+    result = {}
+    for missing in missing_skills:
+        related = [
+            skill
+            for skill in resume_skills
+            if skill_relationship(skill, missing) in {"related", "same_category"}
+        ]
+        if related:
+            result[missing] = related
+    return result
 
 
 def find_known_skills(text: str) -> list[str]:

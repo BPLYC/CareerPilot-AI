@@ -52,6 +52,7 @@ def render(state: dict | None) -> None:
         st.warning(warning)
 
     breakdown = report.get("score_breakdown") or {}
+    evidence = report.get("score_evidence") or {}
     if breakdown:
         labels = {
             "required_skills": "必需技能",
@@ -62,10 +63,23 @@ def render(state: dict | None) -> None:
         }
         st.markdown("#### 评分明细")
         st.dataframe(
-            [{"评分项": labels.get(key, key), "得分": value} for key, value in breakdown.items()],
+            [
+                {
+                    "评分项": labels.get(key, key),
+                    "得分": value,
+                    "证据": "；".join(evidence.get(key, [])),
+                }
+                for key, value in breakdown.items()
+            ],
             width="stretch",
             hide_index=True,
         )
+    transferable = report.get("transferable_skills") or {}
+    if transferable:
+        st.markdown("#### 可迁移技能")
+        st.caption("以下技能只作为相邻经验说明，不会被计为必需技能已匹配。")
+        for missing, available in transferable.items():
+            st.write(f"- {missing}：已有相关经验 {', '.join(available)}")
     if report.get("score_reliable") is False:
         st.info("职位描述未识别出明确的必需技能，因此本次分数为暂定值，工作流不会据此提前停止。")
 

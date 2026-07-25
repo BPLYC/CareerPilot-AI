@@ -65,10 +65,23 @@ def _match_section(state: dict) -> list[str]:
         "",
     ]
     breakdown = report.get("score_breakdown") or {}
+    evidence = report.get("score_evidence") or {}
     if breakdown:
         lines += [
             "### Score breakdown",
-            *[f"- {name.replace('_', ' ').title()}: {value}" for name, value in breakdown.items()],
+            *[
+                f"- {name.replace('_', ' ').title()}: {value}"
+                + (f" — {'; '.join(evidence.get(name, []))}" if evidence.get(name) else "")
+                for name, value in breakdown.items()
+            ],
+            "",
+        ]
+    transferable = report.get("transferable_skills") or {}
+    if transferable:
+        lines += [
+            "### Transferable skills",
+            "_Related experience only; these are not counted as exact required-skill matches._",
+            *[f"- {missing}: {', '.join(skills)}" for missing, skills in transferable.items()],
             "",
         ]
     if report.get("relevant_projects"):

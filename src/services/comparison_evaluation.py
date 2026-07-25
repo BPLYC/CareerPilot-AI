@@ -15,9 +15,9 @@ from src.agents.low_match_warning_agent import low_match_warning_node
 from src.agents.match_scoring_agent import fallback_score_match, match_scoring_node
 from src.agents.rag_retriever_agent import rag_retriever_node
 from src.agents.reflection_agent import reflection_node
-from src.agents.resume_optimizer_agent import resume_optimizer_node
+from src.agents.resume_optimizer_agent import fallback_optimize, resume_optimizer_node
 from src.agents.resume_parser_agent import fallback_parse_resume, resume_parser_node
-from src.services.evaluation import evaluate_state
+from src.services.evaluation import audit_unsupported_claims, evaluate_state
 from src.services.skill_taxonomy import canonical_skill
 from src.workflow.careerpilot_graph import route_after_match_scoring, run_workflow
 from src.workflow.state import create_initial_state
@@ -183,9 +183,14 @@ def evaluate_score_perturbations(resume_text: str, jd_text: str) -> list[dict]:
     return rows
 
 
-def _run_ablation(resume_text: str, jd_text: str, *, use_rag: bool, use_reflection: bool) -> dict:
-    state = create_initial_state(resume_text, jd_text)
-    state = _run_nodes(state, [resume_parser_node, jd_analyzer_node])
+def _run_ablation(base_state: dict, *, use_rag: bool, use_reflection: bool) -> dict:
+    """Run one ablation from a shared intake snapshot.
+
+    Parser/model variance otherwise changes the resume and JD evidence between
+    rows, so a score delta cannot be attributed to RAG or reflection.
+    """
+
+    state = deepcopy(base_state)
     if use_rag:
         state = _merge_state(state, rag_retriever_node(state))
     else:
@@ -211,12 +216,105 @@ def _run_ablation(resume_text: str, jd_text: str, *, use_rag: bool, use_reflecti
 
 
 def evaluate_ablations(resume_text: str, jd_text: str) -> list[dict]:
+    base_state = _run_nodes(
+        create_initial_state(resume_text, jd_text),
+        [resume_parser_node, jd_analyzer_node],
+    )
     runners = {
-        ABLATION_FULL: run_careerpilot_full,
-        ABLATION_NO_RAG: lambda resume, jd: _run_ablation(resume, jd, use_rag=False, use_reflection=True),
-        ABLATION_NO_REFLECTION: lambda resume, jd: _run_ablation(resume, jd, use_rag=True, use_reflection=False),
+        ABLATION_FULL: lambda: _run_ablation(base_state, use_rag=True, use_reflection=True),
+        ABLATION_NO_RAG: lambda: _run_ablation(base_state, use_rag=False, use_reflection=True),
+        ABLATION_NO_REFLECTION: lambda: _run_ablation(base_state, use_rag=True, use_reflection=False),
     }
     return [
-        {"ablation": name, **evaluate_state(runner(resume_text, jd_text))}
+        {"ablation": name, **evaluate_state(runner())}
         for name, runner in runners.items()
     ]
+
+
+def summarize_ablations(rows: list[dict]) -> list[dict]:
+    grouped = defaultdict(list)
+    for row in rows:
+        grouped[row["ablation"]].append(row)
+    summaries = []
+    for ablation in (ABLATION_FULL, ABLATION_NO_RAG, ABLATION_NO_REFLECTION):
+        items = grouped.get(ablation, [])
+        if not items:
+            continue
+        numeric = [
+            key
+            for key, value in items[0].items()
+            if key not in {"case", "ablation"} and isinstance(value, Number)
+        ]
+        summary = {"ablation": ablation, "case_count": len(items)}
+        for metric in numeric:
+            summary[f"avg_{metric}"] = round(
+                sum(float(item.get(metric, 0)) for item in items) / len(items),
+                4,
+            )
+        summaries.append(summary)
+    return summaries
+
+
+def evaluate_controlled_reflection_probe() -> dict:
+    """Exercise the factual-consistency proxy with known supported/unsupported claims.
+
+    This is deliberately a deterministic evaluation fixture, not a claim that
+    the production reflection node can repair every claim category.
+    """
+
+    resume_text = "Built Task Manager with Python and Flask."
+    profile = {
+        "skills": ["Python", "Flask"],
+        "projects": [{"name": "Task Manager", "technologies": ["Python", "Flask"]}],
+    }
+    unsupported_skills = ["Kubernetes"]
+    unsupported_projects = ["Quantum Ledger"]
+    grounded = "Built Task Manager with Python and Flask."
+    injected = grounded + " Improved throughput by 50% using Kubernetes on Quantum Ledger."
+
+    candidates = {
+        "candidate_skills": unsupported_skills,
+        "candidate_projects": unsupported_projects,
+    }
+    before = audit_unsupported_claims(
+        [injected],
+        resume_text,
+        profile,
+        **candidates,
+    )
+    reflection = reflection_node(
+        {
+            "raw_resume_text": resume_text,
+            "optimized_bullets": [
+                {
+                    "context": "Task Manager",
+                    "original_bullet": grounded,
+                    "optimized_bullet": injected,
+                    "rationale": "controlled probe",
+                }
+            ],
+            "reflection_iteration": 0,
+        }
+    )
+    revised_items = fallback_optimize(
+        profile,
+        {"keywords": ["Python"]},
+        {"relevant_projects": ["Task Manager"]},
+        reflection.get("reflection_feedback", ""),
+    )
+    revised = " ".join(item["optimized_bullet"] for item in revised_items)
+    after = audit_unsupported_claims(
+        [revised],
+        resume_text,
+        profile,
+        **candidates,
+    )
+    return {
+        "before_unsupported_claim_count": before["unsupported_claim_count"],
+        "after_unsupported_claim_count": after["unsupported_claim_count"],
+        "grounded_evidence_preserved": int(all(term in revised for term in ("Task Manager", "Python", "Flask"))),
+        "reflection_triggered": int(reflection.get("has_exaggeration", False)),
+        "before": before,
+        "after": after,
+        "revised_bullet": revised,
+    }

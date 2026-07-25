@@ -29,7 +29,10 @@ def contains_keyword(text: str, keyword: str) -> bool:
         return False
     if len(keyword.split()) > 1:
         return keyword in normalized_text
-    return normalize_token(keyword) in {normalize_token(token) for token in normalized_text.split()}
+    normalized_keyword = normalize_token(keyword)
+    if not normalized_keyword:
+        return keyword in normalized_text
+    return normalized_keyword in {normalize_token(token) for token in normalized_text.split()}
 
 
 def unique_preserve_order(values: Iterable[str]) -> list[str]:

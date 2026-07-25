@@ -697,3 +697,13 @@ Verification:
 - Ruff passed.
 - Deterministic evaluation regenerated all CSV outputs.
 - All 12 synthetic score-monotonicity checks passed.
+
+### Completed: Evidence, Parsing, And Controlled Reflection Validation
+
+Date: 2026-07-26
+
+Summary: Generalized deterministic resume parsing beyond the bundled project names. Common English and Chinese education, skills, projects, and work headings now produce independent entries and per-project technology evidence. JD education constraints are structured into level, major, graduation window, GPA, and required/preferred status. Match reports explain every score component and show transferable skills without counting them as exact matches.
+
+Reflection now checks unsupported metrics, JD skills, and project/work contexts. Evaluation reports unsupported metric, skill, project, and total claim counts. A controlled probe injects an unsupported `50%`, `Kubernetes`, and `Quantum Ledger`, triggers the production reflection/regeneration path, removes all three unsupported claims, and preserves the grounded Task Manager/Python/Flask evidence.
+
+A live AI Intern ablation exposed a confound in the original evaluator: independently re-running intake produced different deterministic baselines for identical inputs. Ablations now share one intake snapshot, and a regression test requires equal reference scores. The corrected one-run live smoke test produced a stable 50/50/50 reference score. Full had zero unsupported claims; no-RAG had one; no-reflection had zero. This single run is evidence that the audit works, not proof of a stable component-quality effect. Budget moved from 5.47 CNY to 5.37 CNY and stayed above the 2.00 CNY floor.

@@ -44,6 +44,11 @@ class JobDescriptionAnalysis(BaseModel):
     responsibilities: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     education_requirements: str = Field(default="")
+    education_level: str | None = Field(default=None)
+    education_major: str | None = Field(default=None)
+    graduation_requirement: str | None = Field(default=None)
+    gpa_requirement: float | None = Field(default=None, ge=0, le=5)
+    education_is_required: bool | None = Field(default=None)
     experience_requirements: str = Field(default="")
     tools_and_technologies: list[str] = Field(default_factory=list)
 
@@ -56,6 +61,8 @@ class MatchReport(BaseModel):
     weak_sections: list[str] = Field(default_factory=list)
     explanation: str = Field(default="")
     score_breakdown: dict[str, int] = Field(default_factory=dict)
+    score_evidence: dict[str, list[str]] = Field(default_factory=dict)
+    transferable_skills: dict[str, list[str]] = Field(default_factory=dict)
     score_reliable: bool = Field(default=True)
     scoring_warnings: list[str] = Field(default_factory=list)
 

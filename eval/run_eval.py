@@ -23,8 +23,10 @@ from src.rag.build_vectorstore import DISABLE_VECTORSTORE_ENV
 from src.rag.retriever import retrieve_context
 from src.services.comparison_evaluation import (
     evaluate_ablations,
+    evaluate_controlled_reflection_probe,
     evaluate_methods,
     evaluate_score_perturbations,
+    summarize_ablations,
     summarize_comparison,
 )
 from src.services.evaluation import rag_context_overlap
@@ -120,6 +122,19 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(ablation_rows)
     print(f"Wrote {ablation_path}")
+
+    ablation_summary_path = os.path.join(ROOT, "outputs", "evaluation_ablation_summary.csv")
+    ablation_summary = summarize_ablations(ablation_rows)
+    with open(ablation_summary_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(ablation_summary[0].keys()))
+        writer.writeheader()
+        writer.writerows(ablation_summary)
+    print(f"Wrote {ablation_summary_path}")
+
+    reflection_probe_path = os.path.join(ROOT, "outputs", "reflection_probe.json")
+    with open(reflection_probe_path, "w", encoding="utf-8") as handle:
+        json.dump(evaluate_controlled_reflection_probe(), handle, ensure_ascii=False, indent=2)
+    print(f"Wrote {reflection_probe_path}")
 
 
 if __name__ == "__main__":

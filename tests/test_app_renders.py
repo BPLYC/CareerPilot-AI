@@ -135,6 +135,8 @@ def test_match_report_renders_score_breakdown():
                 "experience_evidence": 10,
                 "education": 10,
             },
+            "score_evidence": {"required_skills": ["Python"]},
+            "transferable_skills": {"Docker": ["Podman"]},
             "score_reliable": True,
         },
         "reference_score": 55,
@@ -144,6 +146,7 @@ def test_match_report_renders_score_breakdown():
 
     assert not app.exception, [str(e) for e in app.exception]
     assert any("评分明细" in element.value for element in app.markdown)
+    assert any("可迁移技能" in element.value for element in app.markdown)
     assert len(app.dataframe) >= 1
 
 

@@ -1,0 +1,31 @@
+{
+  "before_unsupported_claim_count": 3,
+  "after_unsupported_claim_count": 0,
+  "grounded_evidence_preserved": 1,
+  "reflection_triggered": 1,
+  "before": {
+    "unsupported_metric_count": 1,
+    "unsupported_skill_mention_count": 1,
+    "unsupported_project_mention_count": 1,
+    "unsupported_claim_count": 3,
+    "unsupported_metrics": [
+      "50%"
+    ],
+    "unsupported_skills": [
+      "Kubernetes"
+    ],
+    "unsupported_projects": [
+      "Quantum Ledger"
+    ]
+  },
+  "after": {
+    "unsupported_metric_count": 0,
+    "unsupported_skill_mention_count": 0,
+    "unsupported_project_mention_count": 0,
+    "unsupported_claim_count": 0,
+    "unsupported_metrics": [],
+    "unsupported_skills": [],
+    "unsupported_projects": []
+  },
+  "revised_bullet": "使用 Python, Flask 参与“Task Manager”，描述严格限定在简历已确认的事实范围内。"
+}
