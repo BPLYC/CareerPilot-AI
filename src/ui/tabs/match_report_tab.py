@@ -11,6 +11,13 @@ def render(state: dict | None) -> None:
         return
 
     report = state["match_report"]
+    fallback_nodes = set(state.get("fallback_nodes", []))
+    offline_score = "MatchScoringNode" in fallback_nodes
+    if fallback_nodes:
+        st.warning(
+            "本次分析有部分节点无法调用大模型，已采用离线规则。"
+            "离线评分仅供排查参考，请先确认简历解析完整后再判断匹配程度。"
+        )
 
     st.download_button(
         "下载完整报告（Markdown）",
@@ -36,7 +43,7 @@ def render(state: dict | None) -> None:
         )
     else:
         col1, col2, col3 = st.columns(3)
-        col1.metric("匹配评分", f"{score}/100")
+        col1.metric("离线规则评分" if offline_score else "匹配评分", f"{score}/100")
         col2.metric("匹配技能", len(report["matched_skills"]))
         col3.metric("缺失技能", len(report["missing_skills"]))
     st.progress(score / 100)

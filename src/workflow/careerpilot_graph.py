@@ -32,7 +32,7 @@ def route_after_reflection(state) -> str:
 def phase_two_parallel_node(state) -> dict:
     return {
         "workflow_trace": [
-            "PhaseTwoParallelNode: Running application answers and interview coaching in parallel."
+            "PhaseTwoParallelNode：正在并行生成申请回答和面试准备内容。"
         ]
     }
 
@@ -40,7 +40,7 @@ def phase_two_parallel_node(state) -> dict:
 def _merge_state(state: dict, update: dict) -> dict:
     merged = dict(state)
     for key, value in update.items():
-        if key in {"workflow_trace", "errors", "warnings"}:
+        if key in {"workflow_trace", "errors", "warnings", "fallback_nodes"}:
             merged[key] = list(merged.get(key, [])) + list(value or [])
         else:
             merged[key] = value

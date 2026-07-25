@@ -59,24 +59,28 @@ def run_node(
     is exactly how the two branches drift apart.
     """
 
-    def finish(result: Any, failure: Exception | None) -> dict:
+    def finish(result: Any, failure: Exception | None, used_fallback: bool) -> dict:
         if refine is not None:
             result = refine(result)
         update = dict(base_update or {})
         if extra_state is not None:
             update.update(extra_state(result))
         update[output_key] = result
-        if failure is None:
+        if not used_fallback:
             update["workflow_trace"] = [f"{node_name}: {describe(result)}"]
         else:
-            update["errors"] = [f"{node_name} failed and used its deterministic fallback: {failure}"]
-            update["workflow_trace"] = [f"{node_name}: Fallback used. {describe(result)}"]
+            update["fallback_nodes"] = [node_name]
+            if failure is not None:
+                update["errors"] = [f"{node_name} 调用大模型失败，已采用离线规则：{failure}"]
+            update["workflow_trace"] = [f"{node_name}：已采用离线规则。{describe(result)}"]
         return update
 
     try:
-        return finish(llm_branch() if can_use_llm() else fallback_branch(), None)
+        if can_use_llm():
+            return finish(llm_branch(), None, False)
+        return finish(fallback_branch(), None, True)
     except Exception as exc:
-        return finish(fallback_branch(), exc)
+        return finish(fallback_branch(), exc, True)
 
 
 def trace(message: str) -> dict:

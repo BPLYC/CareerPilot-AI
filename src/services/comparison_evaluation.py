@@ -26,7 +26,7 @@ METHOD_ORDER = [METHOD_BASELINE, METHOD_LLM_ONLY, METHOD_FULL]
 def _merge_state(state: dict, update: dict) -> dict:
     merged = dict(state)
     for key, value in update.items():
-        if key in {"workflow_trace", "errors", "warnings"}:
+        if key in {"workflow_trace", "errors", "warnings", "fallback_nodes"}:
             merged[key] = list(merged.get(key, [])) + list(value or [])
         else:
             merged[key] = value

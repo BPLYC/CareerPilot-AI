@@ -140,7 +140,7 @@ def test_match_scoring_warns_on_a_low_model_score(use_llm):
 
     update = match_scoring_agent.match_scoring_node(_state())
 
-    assert any("Low match score" in warning for warning in update["warnings"])
+    assert any("匹配评分较低" in warning for warning in update["warnings"])
 
 
 def test_resume_optimizer_parses_a_json_array(use_llm):
@@ -225,7 +225,7 @@ def test_unparseable_responses_fall_back(use_llm, content):
     update = match_scoring_agent.match_scoring_node(_state())
 
     assert update["errors"], "the parse failure should be recorded"
-    assert "Fallback used." in update["workflow_trace"][0]
+    assert "已采用离线规则" in update["workflow_trace"][0]
     assert isinstance(update["match_report"]["overall_score"], int)
 
 
@@ -235,7 +235,7 @@ def test_a_non_array_response_for_a_list_node_falls_back(use_llm):
     update = resume_optimizer_agent.resume_optimizer_node(_state())
 
     assert update["errors"]
-    assert "Fallback used." in update["workflow_trace"][0]
+    assert "已采用离线规则" in update["workflow_trace"][0]
 
 
 def test_non_string_content_is_handled(use_llm):

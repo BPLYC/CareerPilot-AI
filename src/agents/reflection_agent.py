@@ -16,15 +16,15 @@ def reflection_node(state) -> dict:
     for index, bullet in enumerate(bullets, start=1):
         text = bullet.get("optimized_bullet", "")
         if _unsupported_metric(text, resume_text):
-            issues.append(f"Suggestion {index} contains a metric not present in the resume.")
+            issues.append(f"建议 {index} 包含简历中不存在的指标。")
 
     if issues and iteration < 2:
         next_iteration = iteration + 1
         return {
             "has_exaggeration": True,
-            "reflection_feedback": " ".join(issues) + " Regenerate without unsupported numbers or claims.",
+            "reflection_feedback": " ".join(issues) + " 请去除未经支持的数字或表述后重新生成。",
             "reflection_iteration": next_iteration,
-            "workflow_trace": [f"ReflectionNode (Iteration {next_iteration}): {len(issues)} issue(s) found. Revising."],
+            "workflow_trace": [f"ReflectionNode（第 {next_iteration} 轮）：发现 {len(issues)} 个问题，正在修订。"],
         }
 
     finalized = []
@@ -33,10 +33,10 @@ def reflection_node(state) -> dict:
         if iteration > 0:
             updated["is_revised_by_reflection"] = True
         finalized.append(updated)
-    feedback = "Max iterations reached." if issues else "Passed review."
+    feedback = "已达到最大修订轮数。" if issues else "已通过事实审查。"
     return {
         "has_exaggeration": False,
         "reflection_feedback": feedback,
         "optimized_bullets": finalized,
-        "workflow_trace": [f"ReflectionNode (Iteration {iteration}): {len(issues)} issue(s) found. Finalizing."],
+        "workflow_trace": [f"ReflectionNode（第 {iteration} 轮）：发现 {len(issues)} 个问题，正在完成输出。"],
     }

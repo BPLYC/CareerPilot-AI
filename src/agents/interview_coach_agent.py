@@ -9,24 +9,24 @@ from src.services.structured_output import model_to_dict, validate_dict
 def _project_questions(projects: list[dict]) -> list[dict]:
     questions = []
     for project in projects[:2]:
-        name = project.get("name", "your project")
+        name = project.get("name", "你的项目")
         technologies = ", ".join(project.get("technologies", [])[:4])
-        tech_note = f" Be ready to explain {technologies}." if technologies else ""
+        tech_note = f" 请准备说明 {technologies} 的具体用途。" if technologies else ""
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question=f"Walk me through {name}. What problem did it solve, and what tradeoffs did you make?",
-                    focus_area="Project deep dive",
-                    prep_notes=f"Use only implementation details and outcomes already present in your resume.{tech_note}",
+                    question=f"请介绍一下“{name}”：它解决了什么问题，你做过哪些取舍？",
+                    focus_area="项目深挖",
+                    prep_notes=f"只使用简历中已经出现的实现细节和结果。{tech_note}",
                 )
             )
         )
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question=f"What would you improve or measure next in {name}?",
-                    focus_area="Project follow-up",
-                    prep_notes="Ground the answer in the current project scope; do not add unbuilt features as if they already exist.",
+                    question=f"如果继续完善“{name}”，你下一步会改进或衡量什么？",
+                    focus_area="项目追问",
+                    prep_notes="回答应基于当前项目范围，不要把尚未实现的功能描述成既有成果。",
                 )
             )
         )
@@ -46,9 +46,9 @@ def _role_specific_questions(jd_analysis: dict) -> list[dict]:
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question="How would you evaluate whether a model improvement is real and not just noise?",
-                    focus_area="ML evaluation",
-                    prep_notes="Use validation data, metrics, error analysis, and examples from projects you actually completed.",
+                    question="你会如何判断一次模型改进是真实有效，而不是随机波动？",
+                    focus_area="机器学习评估",
+                    prep_notes="结合验证数据、指标、误差分析和自己真实完成的项目回答。",
                 )
             )
         )
@@ -85,9 +85,9 @@ def fallback_interview_questions(resume_profile: dict, jd_analysis: dict, retrie
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question=f"How have you used {skill} in a project or class assignment?",
-                    focus_area="Required skill evidence",
-                    prep_notes="Prepare a STAR-style answer grounded in a real resume example.",
+                    question=f"你在项目或课程作业中如何使用过 {skill}？",
+                    focus_area="必需技能证据",
+                    prep_notes="基于简历中的真实例子准备一段 STAR 结构回答。",
                 )
             )
         )
@@ -97,9 +97,9 @@ def fallback_interview_questions(resume_profile: dict, jd_analysis: dict, retrie
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question="How do you handle unclear requirements?",
-                    focus_area="Behavioral",
-                    prep_notes="Describe the clarification steps you actually used in a past project.",
+                    question="面对不明确的需求时，你通常如何处理？",
+                    focus_area="行为面试",
+                    prep_notes="说明你在过去项目中实际采用过的澄清步骤。",
                 )
             )
         )
@@ -108,9 +108,9 @@ def fallback_interview_questions(resume_profile: dict, jd_analysis: dict, retrie
         questions.append(
             model_to_dict(
                 InterviewQuestion(
-                    question="Tell me about a technical project from your resume.",
-                    focus_area="General",
-                    prep_notes="Pick one real project and prepare the situation, task, action, and result.",
+                    question="请介绍一个简历中的技术项目。",
+                    focus_area="综合问题",
+                    prep_notes="选择一个真实项目，按情境、任务、行动和结果进行准备。",
                 )
             )
         )
@@ -141,5 +141,5 @@ def interview_coach_node(state) -> dict:
         output_key="interview_questions",
         llm_branch=from_llm,
         fallback_branch=lambda: fallback_interview_questions(resume_profile, jd_analysis, retrieved_context),
-        describe=lambda questions: f"Generated {len(questions)} interview practice questions.",
+        describe=lambda questions: f"已生成 {len(questions)} 道面试练习题。",
     )

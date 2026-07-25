@@ -21,22 +21,22 @@ def fallback_optimize(resume_profile: dict, jd_analysis: dict, match_report: dic
     keywords = jd_analysis.get("keywords", [])[:3]
     suggestions = []
     for item in _source_items(resume_profile, match_report):
-        context = item.get("name") or item.get("role") or item.get("company") or "Resume experience"
+        context = item.get("name") or item.get("role") or item.get("company") or "简历经历"
         techs = item.get("technologies", []) or resume_profile.get("skills", [])[:3]
-        tech_text = ", ".join(techs[:3]) if techs else "relevant tools"
-        keyword_text = ", ".join(keywords) if keywords else "the target role"
+        tech_text = ", ".join(techs[:3]) if techs else "相关工具"
+        keyword_text = ", ".join(keywords) if keywords else "目标职位"
         bullet = (
-            f"Developed and documented {context} using {tech_text}, highlighting experience aligned with {keyword_text}."
+            f"使用 {tech_text} 开发并记录“{context}”，突出与“{keyword_text}”相关的已有经历。"
         )
         if reflection_feedback:
             bullet = (
-                f"Contributed to {context} using {tech_text}, keeping the description limited to confirmed resume evidence."
+                f"使用 {tech_text} 参与“{context}”，描述严格限定在简历已确认的事实范围内。"
             )
         suggestion = BulletSuggestion(
             context=context,
             original_bullet=item.get("description", ""),
             optimized_bullet=bullet,
-            rationale="Connects existing resume evidence to JD keywords without adding unsupported metrics.",
+            rationale="将简历中的已有证据与职位关键词关联，不添加未经支持的指标。",
         )
         suggestions.append(model_to_dict(suggestion))
     return suggestions
@@ -69,5 +69,5 @@ def resume_optimizer_node(state) -> dict:
         output_key="optimized_bullets",
         llm_branch=from_llm,
         fallback_branch=lambda: fallback_optimize(resume_profile, jd_analysis, match_report, feedback),
-        describe=lambda bullets: f"Generated {len(bullets)} bullet suggestions.",
+        describe=lambda bullets: f"已生成 {len(bullets)} 条简历要点建议。",
     )

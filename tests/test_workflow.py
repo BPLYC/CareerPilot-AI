@@ -90,9 +90,9 @@ def test_workflow_answers_custom_application_questions_safely():
     custom_answers = final_state["application_answers"]["custom_answers"]
     assert len(custom_answers) == 2
     assert custom_answers[0]["question"] == "Why are you interested in this internship?"
-    assert "verified resume evidence" in custom_answers[0]["answer"]
+    assert "简历中已经验证" in custom_answers[0]["answer"]
     assert custom_answers[1]["question"] == "Will you require visa sponsorship?"
-    assert "must be filled by the applicant directly" in custom_answers[1]["answer"]
+    assert "必须由申请人本人填写" in custom_answers[1]["answer"]
 
 
 def test_cache_key_includes_custom_application_questions():
@@ -119,8 +119,8 @@ def test_interview_fallback_includes_role_specific_and_project_followups():
     }
     questions = fallback_interview_questions(resume_profile, jd_analysis, {})
     focus_areas = {question["focus_area"] for question in questions}
-    assert "Project follow-up" in focus_areas
-    assert "ML evaluation" in focus_areas
+    assert "项目追问" in focus_areas
+    assert "机器学习评估" in focus_areas
 
 
 def test_low_match_skips_phase_two_prep():

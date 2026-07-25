@@ -43,8 +43,8 @@ def fallback_analyze_jd(text: str) -> dict:
 
 def _describe(analysis: dict) -> str:
     return (
-        f"Identified {len(analysis.get('required_skills', []))} required skills, "
-        f"{len(analysis.get('preferred_skills', []))} preferred skills, {len(analysis.get('keywords', []))} keywords."
+        f"识别到 {len(analysis.get('required_skills', []))} 项必需技能、"
+        f"{len(analysis.get('preferred_skills', []))} 项加分技能和 {len(analysis.get('keywords', []))} 个关键词。"
     )
 
 

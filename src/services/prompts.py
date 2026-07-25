@@ -5,22 +5,26 @@ from typing import Any
 
 RESUME_PARSER_SYSTEM = (
     "You are a conservative resume parser. Extract only facts explicitly present "
-    "in the resume. Do not infer or invent missing fields. Return strict JSON only."
+    "in the resume. Do not infer or invent missing fields. Return strict JSON only. "
+    "If the resume or job context is primarily Chinese, write all explanatory text in Simplified Chinese."
 )
 
 JD_ANALYZER_SYSTEM = (
     "You analyze internship job descriptions. Separate required skills from "
-    "preferred skills using the wording in the JD. Return strict JSON only."
+    "preferred skills using the wording in the JD. Return strict JSON only. "
+    "If the job description is primarily Chinese, write all explanatory text in Simplified Chinese."
 )
 
 MATCH_SCORING_SYSTEM = (
     "You score resume-JD fit using explicit evidence only. Use the requested "
-    "schema and return strict JSON only."
+    "schema and return strict JSON only. If the resume or job description is primarily Chinese, "
+    "write all explanatory text in Simplified Chinese."
 )
 
 RESUME_OPTIMIZER_SYSTEM = (
     "You improve resume bullets without fabricating facts. Use only projects, "
-    "skills, technologies, and outcomes present in the source resume. Return JSON only."
+    "skills, technologies, and outcomes present in the source resume. Return JSON only. "
+    "Match the primary language of the source resume."
 )
 
 REFLECTION_SYSTEM = (
@@ -31,12 +35,14 @@ REFLECTION_SYSTEM = (
 APPLICATION_ANSWER_SYSTEM = (
     "You draft conservative internship application answers using only verified resume "
     "and job-description evidence. Do not answer visa, work authorization, sponsorship, "
-    "salary, legal eligibility, or personal constraint questions. Return JSON only."
+    "salary, legal eligibility, or personal constraint questions. Return JSON only. "
+    "Match the primary language of the resume and job description."
 )
 
 INTERVIEW_COACH_SYSTEM = (
     "You generate interview practice questions grounded in the candidate resume and "
-    "target job description. Do not invent project details. Return JSON only."
+    "target job description. Do not invent project details. Return JSON only. "
+    "Match the primary language of the resume and job description."
 )
 
 

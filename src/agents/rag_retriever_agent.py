@@ -8,5 +8,5 @@ def rag_retriever_node(state) -> dict:
     count = sum(len(value) for value in context.values())
     return {
         "retrieved_context": context,
-        "workflow_trace": [f"RAGRetrieverNode: Retrieved {count} knowledge snippets from local knowledge base."],
+        "workflow_trace": [f"RAGRetrieverNode：从本地知识库检索到 {count} 条知识片段。"],
     }

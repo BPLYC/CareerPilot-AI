@@ -26,6 +26,7 @@ class CareerPilotState(TypedDict):
     workflow_trace: Annotated[list[str], add]
     errors: Annotated[list[str], add]
     warnings: Annotated[list[str], add]
+    fallback_nodes: Annotated[list[str], add]
 
 
 def create_initial_state(
@@ -51,4 +52,5 @@ def create_initial_state(
         "workflow_trace": [],
         "errors": [],
         "warnings": [],
+        "fallback_nodes": [],
     }

@@ -26,27 +26,27 @@ def _report(score):
 
 def test_a_wide_gap_warns():
     warnings = _score_warnings(_report(70), reference=70 - SCORE_GAP_THRESHOLD)
-    assert any("disagree by" in w for w in warnings)
+    assert any("相差" in w for w in warnings)
 
 
 def test_a_narrow_gap_does_not_warn():
     warnings = _score_warnings(_report(70), reference=70 - (SCORE_GAP_THRESHOLD - 1))
-    assert not any("disagree by" in w for w in warnings)
+    assert not any("相差" in w for w in warnings)
 
 
 def test_the_gap_warning_is_symmetric():
     # The model can land either side of the baseline.
     above = _score_warnings(_report(90), reference=90 - SCORE_GAP_THRESHOLD)
     below = _score_warnings(_report(30), reference=30 + SCORE_GAP_THRESHOLD)
-    assert any("disagree by" in w for w in above)
-    assert any("disagree by" in w for w in below)
+    assert any("相差" in w for w in above)
+    assert any("相差" in w for w in below)
 
 
 def test_a_low_score_still_warns_independently():
     warnings = _score_warnings(_report(LOW_MATCH_THRESHOLD - 1), reference=LOW_MATCH_THRESHOLD - 1)
-    assert any("Low match score" in w for w in warnings)
+    assert any("匹配评分较低" in w for w in warnings)
     # Equal scores, so no gap warning rides along.
-    assert not any("disagree by" in w for w in warnings)
+    assert not any("相差" in w for w in warnings)
 
 
 # --- the node, deterministic path ------------------------------------------
@@ -90,7 +90,7 @@ def test_the_model_score_is_kept_not_overwritten_by_the_reference(monkeypatch):
     # baseline. The baseline sits beside it and the disagreement is surfaced.
     assert update["match_report"]["overall_score"] == 15
     assert update["reference_score"] >= 40
-    assert any("disagree by" in w for w in update["warnings"])
+    assert any("相差" in w for w in update["warnings"])
 
 
 # --- export ----------------------------------------------------------------

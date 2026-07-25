@@ -49,7 +49,7 @@ def test_low_match_warning_survives_an_llm_failure(llm_configured_but_failing):
     assert update["errors"], "the failure should be recorded"
     # The warning is what the UI renders to tell the applicant this JD is a poor
     # fit. Losing it because the model happened to fail would hide that.
-    assert any("Low match score" in warning for warning in update["warnings"])
+    assert any("匹配评分较低" in warning for warning in update["warnings"])
 
 
 def test_sensitive_question_boundaries_survive_an_llm_failure(llm_configured_but_failing):
@@ -85,4 +85,21 @@ def test_run_node_reports_the_failure_and_still_returns_output(monkeypatch):
 
     assert update["value"] == "deterministic"
     assert "boom" in update["errors"][0]
-    assert update["workflow_trace"] == ["ExampleNode: Fallback used. Produced deterministic."]
+    assert update["fallback_nodes"] == ["ExampleNode"]
+    assert "已采用离线规则" in update["workflow_trace"][0]
+
+
+def test_run_node_marks_unconfigured_llm_as_offline(monkeypatch):
+    monkeypatch.setattr(common, "can_use_llm", lambda *args, **kwargs: False)
+
+    update = common.run_node(
+        node_name="ExampleNode",
+        output_key="value",
+        llm_branch=lambda: "model",
+        fallback_branch=lambda: "deterministic",
+        describe=lambda value: f"Produced {value}.",
+    )
+
+    assert update["value"] == "deterministic"
+    assert update["fallback_nodes"] == ["ExampleNode"]
+    assert "离线规则" in update["workflow_trace"][0]

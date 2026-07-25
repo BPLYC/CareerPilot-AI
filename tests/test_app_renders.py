@@ -95,7 +95,7 @@ def test_download_button_appears_once_a_result_exists():
     metrics = {element.label: element.value for element in app.metric}
     # No API key in tests, so the model IS the reference scorer and the two
     # agree, collapsing to the single-score layout.
-    assert "匹配评分" in metrics
+    assert "离线规则评分" in metrics
 
 
 def test_diverging_scores_render_side_by_side():
@@ -170,3 +170,25 @@ def test_sensitive_reminder_is_not_shown_before_any_analysis():
     warnings = [element.value for element in app.warning]
 
     assert SENSITIVE_REMINDER not in warnings
+
+
+def test_match_report_labels_fallback_score_as_offline():
+    app = AppTest.from_file("app.py", default_timeout=60)
+    app.session_state["last_result"] = {
+        "match_report": {
+            "overall_score": 8,
+            "matched_skills": [],
+            "missing_skills": ["Java"],
+            "explanation": "离线说明",
+        },
+        "reference_score": 8,
+        "fallback_nodes": ["ResumeParserNode", "JDAnalyzerNode", "MatchScoringNode"],
+        "warnings": [],
+    }
+    app.run()
+
+    assert not app.exception, [str(e) for e in app.exception]
+    labels = {element.label for element in app.metric}
+    assert "离线规则评分" in labels
+    warnings = [element.value for element in app.warning]
+    assert any("离线规则" in warning for warning in warnings)

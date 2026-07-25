@@ -59,8 +59,8 @@ def fallback_parse_resume(text: str) -> dict:
 
 def _describe(profile: dict) -> str:
     return (
-        f"Extracted {len(profile.get('projects', []))} projects, "
-        f"{len(profile.get('skills', []))} skills, {len(profile.get('work_experience', []))} work experiences."
+        f"提取到 {len(profile.get('projects', []))} 个项目、"
+        f"{len(profile.get('skills', []))} 项技能和 {len(profile.get('work_experience', []))} 段工作经历。"
     )
 
 

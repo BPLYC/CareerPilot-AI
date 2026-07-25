@@ -27,11 +27,11 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
 
     weak_sections = []
     if missing:
-        weak_sections.append("Skill gaps in required technologies")
+        weak_sections.append("必需技术存在技能缺口")
     if not resume_profile.get("work_experience"):
-        weak_sections.append("Limited internship or work experience")
+        weak_sections.append("实习或工作经历较少")
     if not relevant_projects:
-        weak_sections.append("Few clearly relevant projects")
+        weak_sections.append("与职位直接相关的项目较少")
 
     return model_to_dict(
         MatchReport(
@@ -40,7 +40,10 @@ def fallback_score_match(resume_profile: dict, jd_analysis: dict) -> dict:
             missing_skills=missing,
             relevant_projects=relevant_projects,
             weak_sections=weak_sections,
-            explanation=f"The resume matches {len(matched)} required skills and misses {len(missing)}. The score reflects skill overlap, project relevance, education, and experience evidence.",
+            explanation=(
+                f"简历匹配 {len(matched)} 项必需技能，缺失 {len(missing)} 项。"
+                "评分综合考虑技能重合度、项目相关性、教育背景和经历证据。"
+            ),
         )
     )
 
@@ -56,8 +59,8 @@ SCORE_GAP_THRESHOLD = 20
 
 def _describe(report: dict) -> str:
     return (
-        f"Score = {report['overall_score']}/100. "
-        f"{len(report['matched_skills'])} matched skills, {len(report['missing_skills'])} missing skills."
+        f"评分 {report['overall_score']}/100，"
+        f"匹配 {len(report['matched_skills'])} 项技能，缺失 {len(report['missing_skills'])} 项技能。"
     )
 
 
@@ -65,15 +68,14 @@ def _score_warnings(report: dict, reference: int) -> list[str]:
     warnings = []
     if report["overall_score"] < LOW_MATCH_THRESHOLD:
         warnings.append(
-            f"Low match score ({report['overall_score']}/100). This JD may not be the best fit. "
-            "Consider the suggestions in the report."
+            f"匹配评分较低（{report['overall_score']}/100）。该职位可能不是当前最合适的选择，"
+            "请结合报告中的技能缺口和建议综合判断。"
         )
     gap = abs(report["overall_score"] - reference)
     if gap >= SCORE_GAP_THRESHOLD:
         warnings.append(
-            f"The AI score ({report['overall_score']}/100) and the rule-based score "
-            f"({reference}/100) disagree by {gap} points. Treat the number as approximate "
-            "and weigh the matched and missing skills, which are steadier."
+            f"AI 评分（{report['overall_score']}/100）与规则基准评分（{reference}/100）"
+            f"相差 {gap} 分。请将分数视为近似参考，并优先关注更稳定的匹配与缺失技能。"
         )
     return warnings
 

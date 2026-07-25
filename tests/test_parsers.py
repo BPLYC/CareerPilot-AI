@@ -44,6 +44,20 @@ def _docx_bytes(paragraphs: list[str]) -> bytes:
     return buffer.getvalue()
 
 
+def _table_docx_bytes() -> bytes:
+    docx = pytest.importorskip("docx")
+    document = docx.Document()
+    document.add_paragraph("林依诚")
+    table = document.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "技能"
+    table.cell(0, 1).text = "Python、RAG、LangChain"
+    table.cell(1, 0).text = "项目"
+    table.cell(1, 1).text = "智能体应用开发"
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
 def test_none_upload_returns_empty_string():
     assert parse_resume_file(None) == ""
     assert parse_pdf(None) == ""
@@ -95,6 +109,14 @@ def test_docx_round_trip():
     # Blank and whitespace-only paragraphs are dropped rather than becoming
     # empty lines in the resume text.
     assert "\n\n" not in text
+
+
+def test_docx_extracts_resume_content_stored_in_tables():
+    text = parse_resume_file(Upload("resume.docx", _table_docx_bytes()))
+
+    assert "林依诚" in text
+    assert "Python、RAG、LangChain" in text
+    assert "智能体应用开发" in text
 
 
 def test_extension_matching_is_case_insensitive():
