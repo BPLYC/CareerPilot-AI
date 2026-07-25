@@ -206,7 +206,7 @@ Does not call the LLM. It builds a query from job title, required skills, and to
 
 ### MatchScoringNode
 
-Produces `MatchReport` with score from 0 to 100. Current fallback scoring uses skill overlap, relevant project count, education evidence, and experience evidence.
+Produces `MatchReport` with a score from 0 to 100 and an inspectable breakdown: required skills 40, preferred skills 10, relevant project evidence 25, relevant work evidence 15, and education requirements 10. Project and work relevance is calculated only from each item's own evidence. Scores with no parsed required skills are provisional and do not trigger the low-match branch. The stable deterministic score controls routing; the model score remains visible as an advisory comparison.
 
 ### LowMatchWarningNode
 

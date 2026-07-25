@@ -51,6 +51,24 @@ def render(state: dict | None) -> None:
     for warning in state.get("warnings", []):
         st.warning(warning)
 
+    breakdown = report.get("score_breakdown") or {}
+    if breakdown:
+        labels = {
+            "required_skills": "必需技能",
+            "preferred_skills": "加分技能",
+            "project_evidence": "相关项目",
+            "experience_evidence": "相关经历",
+            "education": "教育要求",
+        }
+        st.markdown("#### 评分明细")
+        st.dataframe(
+            [{"评分项": labels.get(key, key), "得分": value} for key, value in breakdown.items()],
+            width="stretch",
+            hide_index=True,
+        )
+    if report.get("score_reliable") is False:
+        st.info("职位描述未识别出明确的必需技能，因此本次分数为暂定值，工作流不会据此提前停止。")
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("#### 匹配技能")

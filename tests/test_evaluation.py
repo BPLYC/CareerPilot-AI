@@ -1,4 +1,15 @@
 from src.services.evaluation import evaluate_state
+from src.services.scoring import action_evidence_rate, result_evidence_rate, star_coverage_rate
+
+
+def test_star_proxy_supports_chinese_and_english_cues():
+    bullets = [
+        "Implemented validation that improved release confidence.",
+        "构建数据清洗流程，提升了报告质量。",
+    ]
+    assert action_evidence_rate(bullets) == 1.0
+    assert result_evidence_rate(bullets) == 1.0
+    assert star_coverage_rate(bullets) == 1.0
 
 
 def test_evaluation_counts_phase_two_quality_metrics():

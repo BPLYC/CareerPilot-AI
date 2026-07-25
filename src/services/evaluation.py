@@ -1,7 +1,13 @@
 """Evaluation metric helpers."""
 
 from src.rag.knowledge_loader import load_all_knowledge_docs
-from src.services.scoring import keyword_coverage, skill_match_rate, star_coverage_rate
+from src.services.scoring import (
+    action_evidence_rate,
+    keyword_coverage,
+    result_evidence_rate,
+    skill_match_rate,
+    star_coverage_rate,
+)
 from src.utils.text_utils import contains_keyword
 
 SENSITIVE_TERMS = (
@@ -166,6 +172,11 @@ def evaluate_state(state: dict) -> dict:
         "bullet_count_generated": bullet_count,
         "reflection_revision_rate": (len(revised) / bullet_count) if bullet_count else 0.0,
         "star_coverage_rate": star_coverage_rate(bullets),
+        "action_evidence_rate": action_evidence_rate(bullets),
+        "result_evidence_rate": result_evidence_rate(bullets),
+        "match_score": report.get("overall_score", 0),
+        "reference_score": state.get("reference_score") or report.get("overall_score", 0),
+        "score_reliable": int(report.get("score_reliable", True)),
         "application_answer_count": len(application_answers),
         "custom_application_answer_count": len(custom_answers),
         "sensitive_application_refusal_count": _sensitive_refusal_count(answers),

@@ -15,7 +15,14 @@ from src.agents.resume_parser_agent import resume_parser_node
 
 
 def route_after_match_scoring(state) -> str:
-    score = (state.get("match_report") or {}).get("overall_score", 0)
+    report = state.get("match_report") or {}
+    if report.get("score_reliable") is False:
+        return "resume_optimizer"
+    score = state.get("routing_score")
+    if score is None:
+        score = state.get("reference_score")
+    if score is None:
+        score = report.get("overall_score", 0)
     if score < 45:
         return "low_match_warning"
     return "resume_optimizer"

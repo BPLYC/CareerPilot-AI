@@ -64,6 +64,13 @@ def _match_section(state: dict) -> list[str]:
         *_bullet_list(report.get("missing_skills", []), "None identified."),
         "",
     ]
+    breakdown = report.get("score_breakdown") or {}
+    if breakdown:
+        lines += [
+            "### Score breakdown",
+            *[f"- {name.replace('_', ' ').title()}: {value}" for name, value in breakdown.items()],
+            "",
+        ]
     if report.get("relevant_projects"):
         lines += ["### Relevant projects", *_bullet_list(report["relevant_projects"], ""), ""]
     if report.get("weak_sections"):

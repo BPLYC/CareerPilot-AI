@@ -52,7 +52,7 @@ def _summarise(label: str, state: dict) -> JobComparison:
     return JobComparison(
         label=label,
         job_title=analysis.get("job_title") or label,
-        score=report.get("overall_score", 0),
+        score=state.get("routing_score") or state.get("reference_score") or report.get("overall_score", 0),
         matched_skills=list(report.get("matched_skills", [])),
         missing_skills=list(report.get("missing_skills", [])),
         bullet_count=len(state.get("optimized_bullets", [])),

@@ -120,6 +120,33 @@ def test_diverging_scores_render_side_by_side():
     assert "匹配评分" not in labels
 
 
+def test_match_report_renders_score_breakdown():
+    app = AppTest.from_file("app.py", default_timeout=60)
+    app.session_state["last_result"] = {
+        "match_report": {
+            "overall_score": 55,
+            "matched_skills": ["Python"],
+            "missing_skills": ["Docker"],
+            "explanation": "x",
+            "score_breakdown": {
+                "required_skills": 20,
+                "preferred_skills": 5,
+                "project_evidence": 10,
+                "experience_evidence": 10,
+                "education": 10,
+            },
+            "score_reliable": True,
+        },
+        "reference_score": 55,
+        "warnings": [],
+    }
+    app.run()
+
+    assert not app.exception, [str(e) for e in app.exception]
+    assert any("评分明细" in element.value for element in app.markdown)
+    assert len(app.dataframe) >= 1
+
+
 def test_load_all_sample_jds_actually_fills_the_boxes():
     """A keyed widget ignores `value=` after its first render.
 

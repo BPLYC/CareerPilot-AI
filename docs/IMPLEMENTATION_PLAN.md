@@ -682,3 +682,18 @@ Verification:
 - The summary CSV shows Baseline with 0 generated bullets and 0 RAG snippets, LLM-only with generated bullets but 0 RAG/reflection/parallel workflow counts, and CareerPilot Full with RAG snippets, reflection review, and Phase 2 parallel execution counts.
 
 Next: Do focused Streamlit UI polish based on manual testing, or add an optional demo GIF.
+
+### Completed: Explainable Scoring And Calibration
+
+Date: 2026-07-26
+
+Summary: Replaced the inflated count-based fallback score with a five-component rubric. Fixed the project self-match bug, removed project double counting from experience, added skill aliases and empty-required-skill safeguards, extracted real project/education/work evidence in the offline parser, and routed on the stable deterministic score. Match reports now carry an optional backward-compatible breakdown and reliability flag. The UI and Markdown export show the breakdown, while multi-JD ranking uses the stable score.
+
+Evaluation now reports bilingual action/result/STAR proxy coverage, score fields, 12 synthetic monotonicity checks across the bundled cases, and separate Full/Full-no-RAG/Full-no-reflection results. These tests establish deterministic invariants and component execution; human-labelled calibration remains future work.
+
+Verification:
+
+- Full pytest suite passed with `--basetemp=.pytest_tmp`.
+- Ruff passed.
+- Deterministic evaluation regenerated all CSV outputs.
+- All 12 synthetic score-monotonicity checks passed.

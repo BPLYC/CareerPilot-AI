@@ -3,7 +3,7 @@
 import re
 
 from src.agents.common import invoke_structured, run_node
-from src.models.schemas import ProjectExperience, ResumeProfile, WorkExperience
+from src.models.schemas import Education, ProjectExperience, ResumeProfile, WorkExperience
 from src.services.prompts import RESUME_PARSER_SYSTEM, schema_instruction
 from src.services.skill_taxonomy import find_known_skills
 from src.services.structured_output import model_to_dict
@@ -20,6 +20,7 @@ def _extract_name(text: str) -> str:
 
 def fallback_parse_resume(text: str) -> dict:
     cleaned = clean_text(text)
+    lines = [line.strip() for line in (text or "").splitlines()]
     email_match = re.search(r"[\w.\-+]+@[\w.\-]+\.\w+", cleaned)
     phone_match = re.search(r"(\+?\d[\d\-\s()]{7,}\d)", cleaned)
     skills = unique_preserve_order(find_known_skills(cleaned))
@@ -30,26 +31,78 @@ def fallback_parse_resume(text: str) -> dict:
         "Sales Data Dashboard",
         "Personal Task Manager Web App",
     ]
-    for name in project_patterns:
+    lowered = cleaned.lower()
+    for index, name in enumerate(project_patterns):
         if name.lower() in cleaned.lower():
-            techs = [skill for skill in skills if skill.lower() in cleaned.lower()]
-            projects.append(model_to_dict(ProjectExperience(name=name, description=f"Project mentioned in resume: {name}.", technologies=techs)))
+            start = lowered.index(name.lower())
+            later_starts = [
+                lowered.index(other.lower(), start + len(name))
+                for other in project_patterns[index + 1:]
+                if other.lower() in lowered[start + len(name):]
+            ]
+            experience_start = lowered.find(" experience ", start + len(name))
+            if experience_start >= 0:
+                later_starts.append(experience_start)
+            end = min(later_starts) if later_starts else len(cleaned)
+            section = cleaned[start:end]
+            techs = unique_preserve_order(find_known_skills(section))
+            projects.append(model_to_dict(ProjectExperience(name=name, description=section, technologies=techs)))
+
+    education = []
+    degree_line = next(
+        (
+            line
+            for line in lines
+            if re.search(r"(?i)\b(bachelor|master|phd|b\.?s\.?|m\.?s\.?)\b", line)
+        ),
+        "",
+    )
+    if degree_line:
+        education.append(
+            model_to_dict(
+                Education(
+                    school="unknown",
+                    degree=degree_line,
+                    major="unknown",
+                    graduation_date="unknown",
+                )
+            )
+        )
 
     work_experience = []
-    if "intern" in cleaned.lower():
+    experience_index = next(
+        (index for index, line in enumerate(lines) if line.lower() in {"experience", "work experience"}),
+        None,
+    )
+    if experience_index is not None:
+        experience_lines = [line for line in lines[experience_index + 1:] if line]
+        role_line = experience_lines[0] if experience_lines else "Experience"
+        description = " ".join(experience_lines[1:]) or role_line
         work_experience.append(
             model_to_dict(WorkExperience(
                 company="unknown",
-                role="Intern",
+                role=role_line,
                 duration="",
-                description="Internship experience mentioned in resume.",
+                description=description,
             ))
+        )
+    elif "intern" in cleaned.lower():
+        work_experience.append(
+            model_to_dict(
+                WorkExperience(
+                    company="unknown",
+                    role="Intern",
+                    duration="",
+                    description="Internship experience mentioned in resume.",
+                )
+            )
         )
 
     profile = ResumeProfile(
         name=_extract_name(text),
         email=email_match.group(0) if email_match else "unknown",
         phone=phone_match.group(0) if phone_match else "unknown",
+        education=education,
         skills=skills,
         projects=projects,
         work_experience=work_experience,

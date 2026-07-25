@@ -55,6 +55,9 @@ class MatchReport(BaseModel):
     relevant_projects: list[str] = Field(default_factory=list)
     weak_sections: list[str] = Field(default_factory=list)
     explanation: str = Field(default="")
+    score_breakdown: dict[str, int] = Field(default_factory=dict)
+    score_reliable: bool = Field(default=True)
+    scoring_warnings: list[str] = Field(default_factory=list)
 
 
 class BulletSuggestion(BaseModel):

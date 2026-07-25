@@ -21,7 +21,12 @@ if ROOT not in sys.path:
 from src.agents.jd_analyzer_agent import fallback_analyze_jd
 from src.rag.build_vectorstore import DISABLE_VECTORSTORE_ENV
 from src.rag.retriever import retrieve_context
-from src.services.comparison_evaluation import evaluate_methods, summarize_comparison
+from src.services.comparison_evaluation import (
+    evaluate_ablations,
+    evaluate_methods,
+    evaluate_score_perturbations,
+    summarize_comparison,
+)
 from src.services.evaluation import rag_context_overlap
 
 # Cleared for deterministic runs. Emptying the key is what flips
@@ -64,9 +69,17 @@ def main() -> None:
         cases = json.load(handle)
 
     rows = []
+    calibration_rows = []
+    ablation_rows = []
     for case in cases:
-        for metrics in evaluate_methods(read_text(case["resume_path"]), read_text(case["jd_path"])):
+        resume_text = read_text(case["resume_path"])
+        jd_text = read_text(case["jd_path"])
+        for metrics in evaluate_methods(resume_text, jd_text):
             rows.append({"case": case["case"], **metrics})
+        for metrics in evaluate_score_perturbations(resume_text, jd_text):
+            calibration_rows.append({"case": case["case"], **metrics})
+        for metrics in evaluate_ablations(resume_text, jd_text):
+            ablation_rows.append({"case": case["case"], **metrics})
 
     # Cross-case, so it cannot live in the per-case metrics: how much the
     # retrieved context is shared between roles. Unlike the per-row RAG numbers
@@ -89,6 +102,24 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(summary_rows)
     print(f"Wrote {summary_path}")
+
+    calibration_path = os.path.join(ROOT, "outputs", "scoring_calibration.csv")
+    with open(calibration_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(calibration_rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(calibration_rows)
+    passed = sum(row["passed"] for row in calibration_rows)
+    print(
+        f"Wrote {calibration_path} "
+        f"({passed}/{len(calibration_rows)} monotonicity checks passed)"
+    )
+
+    ablation_path = os.path.join(ROOT, "outputs", "evaluation_ablation_results.csv")
+    with open(ablation_path, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(ablation_rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(ablation_rows)
+    print(f"Wrote {ablation_path}")
 
 
 if __name__ == "__main__":

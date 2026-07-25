@@ -16,8 +16,14 @@ JD_ANALYZER_SYSTEM = (
 )
 
 MATCH_SCORING_SYSTEM = (
-    "You score resume-JD fit using explicit evidence only. Use the requested "
-    "schema and return strict JSON only. If the resume or job description is primarily Chinese, "
+    "You score resume-JD fit using explicit evidence only. Use this fixed 100-point rubric: "
+    "required_skills 0-40, preferred_skills 0-10, project_evidence 0-25, "
+    "experience_evidence 0-15, education 0-10. Put those exact keys in score_breakdown. "
+    "A project or work item is relevant only when its own text contains role evidence; do not "
+    "award points merely because the JD contains a term. overall_score must equal the sum of "
+    "the five components. Set score_reliable=false when the JD has no identifiable required "
+    "skills. Use the requested schema and return strict JSON only. "
+    "If the resume or job description is primarily Chinese, "
     "write all explanatory text in Simplified Chinese."
 )
 

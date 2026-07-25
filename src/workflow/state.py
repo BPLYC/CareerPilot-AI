@@ -16,6 +16,7 @@ class CareerPilotState(TypedDict):
     # user reads the model score as the headline, so the baseline is carried
     # through for comparison rather than discarded.
     reference_score: int | None
+    routing_score: int | None
     optimized_bullets: list[dict]
     has_exaggeration: bool
     reflection_feedback: str
@@ -42,6 +43,7 @@ def create_initial_state(
         "retrieved_context": {},
         "match_report": None,
         "reference_score": None,
+        "routing_score": None,
         "optimized_bullets": [],
         "has_exaggeration": False,
         "reflection_feedback": "",

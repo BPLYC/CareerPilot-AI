@@ -5,7 +5,7 @@ import json
 import os
 
 CACHE_DIR = os.path.join("outputs", "cache")
-CACHE_VERSION = "v4"
+CACHE_VERSION = "v5"
 
 # Raw resume and job-description text are inputs, never rendered from the cached
 # state, and the project promises they are not persisted. Redact them before the

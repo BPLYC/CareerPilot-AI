@@ -15,6 +15,24 @@ def test_low_match_route():
     assert route_after_match_scoring(state) == "low_match_warning"
 
 
+def test_route_uses_stable_routing_score_when_ai_score_is_an_outlier():
+    state = {
+        "match_report": {"overall_score": 3},
+        "reference_score": 79,
+        "routing_score": 79,
+    }
+    assert route_after_match_scoring(state) == "resume_optimizer"
+
+
+def test_unreliable_score_does_not_truncate_the_workflow():
+    state = {
+        "match_report": {"overall_score": 20, "score_reliable": False},
+        "reference_score": 20,
+        "routing_score": None,
+    }
+    assert route_after_match_scoring(state) == "resume_optimizer"
+
+
 def test_reflection_route_stops_at_limit():
     assert route_after_reflection({"has_exaggeration": True, "reflection_iteration": 1}) == "resume_optimizer"
     assert route_after_reflection({"has_exaggeration": True, "reflection_iteration": 2}) == "phase_two_parallel"

@@ -2,7 +2,9 @@ from src.services.comparison_evaluation import (
     METHOD_BASELINE,
     METHOD_FULL,
     METHOD_LLM_ONLY,
+    evaluate_ablations,
     evaluate_methods,
+    evaluate_score_perturbations,
     summarize_comparison,
 )
 
@@ -39,3 +41,23 @@ def test_summarize_comparison_averages_numeric_metrics_by_method():
     assert summary[0]["case_count"] == 2
     assert summary[0]["avg_keyword_coverage_delta"] == 0.1
     assert summary[1]["avg_bullet_count_generated"] == 2.0
+
+
+def test_score_perturbations_are_monotonic():
+    rows = evaluate_score_perturbations(RESUME, JD)
+    by_variant = {row["variant"]: row for row in rows}
+
+    assert all(row["passed"] for row in rows)
+    assert by_variant["remove_required_skill"]["score_delta"] <= 0
+    assert by_variant["remove_project_and_work_evidence"]["score_delta"] <= 0
+    assert by_variant["add_irrelevant_skill"]["score_delta"] == 0
+
+
+def test_ablations_change_only_the_target_workflow_components():
+    rows = {row["ablation"]: row for row in evaluate_ablations(RESUME, JD)}
+
+    assert rows["Full"]["rag_snippet_count"] > 0
+    assert rows["Full-no-RAG"]["rag_snippet_count"] == 0
+    assert rows["Full"]["reflection_review_count"] > 0
+    assert rows["Full-no-reflection"]["reflection_review_count"] == 0
+    assert {row["phase_two_parallel_count"] for row in rows.values()} == {1}

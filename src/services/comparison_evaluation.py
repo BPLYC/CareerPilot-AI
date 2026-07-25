@@ -4,23 +4,31 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
+from copy import deepcopy
 from numbers import Number
 
 from src.agents.application_answer_agent import application_answer_node
 from src.agents.final_report_agent import final_report_node
 from src.agents.interview_coach_agent import interview_coach_node
 from src.agents.jd_analyzer_agent import fallback_analyze_jd, jd_analyzer_node
+from src.agents.low_match_warning_agent import low_match_warning_node
 from src.agents.match_scoring_agent import fallback_score_match, match_scoring_node
+from src.agents.rag_retriever_agent import rag_retriever_node
+from src.agents.reflection_agent import reflection_node
 from src.agents.resume_optimizer_agent import resume_optimizer_node
 from src.agents.resume_parser_agent import fallback_parse_resume, resume_parser_node
 from src.services.evaluation import evaluate_state
-from src.workflow.careerpilot_graph import run_workflow
+from src.services.skill_taxonomy import canonical_skill
+from src.workflow.careerpilot_graph import route_after_match_scoring, run_workflow
 from src.workflow.state import create_initial_state
 
 METHOD_BASELINE = "Baseline"
 METHOD_LLM_ONLY = "LLM-only"
 METHOD_FULL = "CareerPilot Full"
 METHOD_ORDER = [METHOD_BASELINE, METHOD_LLM_ONLY, METHOD_FULL]
+ABLATION_FULL = "Full"
+ABLATION_NO_RAG = "Full-no-RAG"
+ABLATION_NO_REFLECTION = "Full-no-reflection"
 
 
 def _merge_state(state: dict, update: dict) -> dict:
@@ -121,3 +129,94 @@ def summarize_comparison(rows: list[dict]) -> list[dict]:
             summary[f"avg_{metric}"] = round(average, 4)
         summary_rows.append(summary)
     return summary_rows
+
+
+def evaluate_score_perturbations(resume_text: str, jd_text: str) -> list[dict]:
+    """Check score monotonicity without pretending program scores are human labels."""
+
+    profile = fallback_parse_resume(resume_text)
+    analysis = fallback_analyze_jd(jd_text)
+
+    variants = [("original", profile, "baseline")]
+
+    removed_skill = deepcopy(profile)
+    required = {canonical_skill(skill) for skill in analysis.get("required_skills", [])}
+    removed = False
+    retained = []
+    for skill in removed_skill.get("skills", []):
+        if not removed and canonical_skill(skill) in required:
+            removed = True
+            continue
+        retained.append(skill)
+    removed_skill["skills"] = retained
+    variants.append(("remove_required_skill", removed_skill, "not_above_original"))
+
+    removed_evidence = deepcopy(profile)
+    removed_evidence["projects"] = []
+    removed_evidence["work_experience"] = []
+    variants.append(("remove_project_and_work_evidence", removed_evidence, "not_above_original"))
+
+    irrelevant = deepcopy(profile)
+    irrelevant["skills"] = list(irrelevant.get("skills", [])) + ["Underwater Basket Weaving"]
+    variants.append(("add_irrelevant_skill", irrelevant, "equal_original"))
+
+    rows = []
+    original_score = fallback_score_match(profile, analysis)["overall_score"]
+    for variant, candidate, expectation in variants:
+        score = fallback_score_match(candidate, analysis)["overall_score"]
+        if expectation == "not_above_original":
+            passed = score <= original_score
+        elif expectation == "equal_original":
+            passed = score == original_score
+        else:
+            passed = True
+        rows.append(
+            {
+                "variant": variant,
+                "expectation": expectation,
+                "score": score,
+                "score_delta": score - original_score,
+                "route_changed": int((score < 45) != (original_score < 45)),
+                "passed": int(passed),
+            }
+        )
+    return rows
+
+
+def _run_ablation(resume_text: str, jd_text: str, *, use_rag: bool, use_reflection: bool) -> dict:
+    state = create_initial_state(resume_text, jd_text)
+    state = _run_nodes(state, [resume_parser_node, jd_analyzer_node])
+    if use_rag:
+        state = _merge_state(state, rag_retriever_node(state))
+    else:
+        state = _merge_state(state, {"retrieved_context": {}, "workflow_trace": ["Ablation: RAG disabled."]})
+    state = _merge_state(state, match_scoring_node(state))
+    if route_after_match_scoring(state) == "low_match_warning":
+        state = _merge_state(state, low_match_warning_node(state))
+        return _merge_state(state, final_report_node(state))
+
+    state = _merge_state(state, resume_optimizer_node(state))
+    if use_reflection:
+        state = _merge_state(state, reflection_node(state))
+        while state.get("has_exaggeration") and state.get("reflection_iteration", 0) < 2:
+            state = _merge_state(state, resume_optimizer_node(state))
+            state = _merge_state(state, reflection_node(state))
+    else:
+        state = _merge_state(state, {"workflow_trace": ["Ablation: reflection disabled."]})
+    state = _merge_state(
+        state,
+        {"workflow_trace": ["PhaseTwoParallelNode：正在生成申请回答和面试准备内容。"]},
+    )
+    return _run_nodes(state, [application_answer_node, interview_coach_node, final_report_node])
+
+
+def evaluate_ablations(resume_text: str, jd_text: str) -> list[dict]:
+    runners = {
+        ABLATION_FULL: run_careerpilot_full,
+        ABLATION_NO_RAG: lambda resume, jd: _run_ablation(resume, jd, use_rag=False, use_reflection=True),
+        ABLATION_NO_REFLECTION: lambda resume, jd: _run_ablation(resume, jd, use_rag=True, use_reflection=False),
+    }
+    return [
+        {"ablation": name, **evaluate_state(runner(resume_text, jd_text))}
+        for name, runner in runners.items()
+    ]

@@ -1,0 +1,13 @@
+case,variant,expectation,score,score_delta,route_changed,passed
+case_1_ai_intern,original,baseline,61,0,0,1
+case_1_ai_intern,remove_required_skill,not_above_original,55,-6,0,1
+case_1_ai_intern,remove_project_and_work_evidence,not_above_original,33,-28,1,1
+case_1_ai_intern,add_irrelevant_skill,equal_original,61,0,0,1
+case_2_swe_intern,original,baseline,50,0,0,1
+case_2_swe_intern,remove_required_skill,not_above_original,40,-10,1,1
+case_2_swe_intern,remove_project_and_work_evidence,not_above_original,30,-20,1,1
+case_2_swe_intern,add_irrelevant_skill,equal_original,50,0,0,1
+case_3_data_analyst,original,baseline,65,0,0,1
+case_3_data_analyst,remove_required_skill,not_above_original,51,-14,0,1
+case_3_data_analyst,remove_project_and_work_evidence,not_above_original,37,-28,1,1
+case_3_data_analyst,add_irrelevant_skill,equal_original,65,0,0,1

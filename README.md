@@ -158,7 +158,9 @@ Evaluation runs deterministically by default: it clears the DeepSeek credentials
 python eval/run_eval.py --live
 ```
 
-The script writes `outputs/evaluation_results.csv` with one row per case and method, plus `outputs/evaluation_comparison_summary.csv` with method-level averages. Metrics include keyword coverage before and after generated bullets, required skill match rate, reflection revision rate, STAR-ready bullet coverage, application answer evidence coverage, sensitive-question refusal count, interview prep-notes coverage, project follow-up count, role-specific question count, required-skill evidence question count, RAG snippet count, workflow trace count, reflection review count, and Phase 2 parallel execution count.
+The script writes `outputs/evaluation_results.csv` with one row per case and method, `outputs/evaluation_comparison_summary.csv` with method-level averages, `outputs/scoring_calibration.csv` with synthetic score-monotonicity checks, and `outputs/evaluation_ablation_results.csv` with single-component RAG/reflection ablations. Metrics include keyword coverage, score components, bilingual action/result and STAR proxies, evidence coverage, interview coverage, RAG execution, reflection review, and workflow structure.
+
+The deterministic match score uses a fixed, inspectable 100-point rubric: required skills 40, preferred skills 10, relevant project evidence 25, relevant work evidence 15, and education requirements 10. Projects and work entries earn credit only from evidence in their own text. If the JD parser cannot identify required skills, the score is marked provisional and cannot trigger the low-match cutoff.
 
 ## Safety And Privacy
 
@@ -171,7 +173,9 @@ The script writes `outputs/evaluation_results.csv` with one row per case and met
 
 ## Limitations
 
-- The LLM scores lower than the deterministic scorer, consistently. Measured over four runs per role on the bundled samples: AI Intern 40-55 against 68, Data Analyst 60-65 against 79, SWE Intern 50 every time against 72. Run-to-run variation is small (0-15 points); the gap between the two scorers is the systematic part. The app handles this rather than hiding it: both scores are shown side by side when they differ, and a warning fires when they disagree by 20 points or more. The model's number is never silently rewritten. Still, read the score as a rough signal and rely on the matched and missing skills, which are stable.
+- The AI score remains an approximate assessment and is shown beside the deterministic rubric when they differ. Workflow routing and multi-JD ranking use the stable rule-based score, so an anomalous model score cannot prematurely stop generation. A 20-point disagreement still raises a warning.
+- The bundled calibration suite checks monotonic behavior, not human agreement. Absolute calibration, MAE, and rank correlation require a larger human-labelled resume/JD set.
+- Deterministic RAG/reflection ablations can prove that components ran and whether proxy metrics changed; they do not by themselves establish real-model quality gains.
 - Fallback parsing is simple and intended for offline demos.
 - RAG uses deterministic local retrieval unless optional vector-store dependencies are installed.
 - Model quality depends on the configured DeepSeek model.
